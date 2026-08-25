@@ -94,12 +94,12 @@
 1345	1503	8093648318614699	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoder.exe	afe825bfcc0ae26c
 1353	1509	8093648318680866	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleDecoder.exe	501983eef91ce871
 33	1174	8093653933261910	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/CudaSmokeTest.cu.obj	34d8f7c2dd4c716d
-52	237	8093697264214116	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	cdfaca36fa6ac16b
-52	237	8093697264214116	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	cdfaca36fa6ac16b
+51	253	8093982980062543	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+51	253	8093982980062543	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
 1281	1431	8093648909664713	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsEncApp.exe	dc5da7895b20e2b7
-43	524	8093702272414542	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/main.cpp.obj	4ac61ce05a884daa
+45	759	8093985262590161	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/main.cpp.obj	4ac61ce05a884daa
 40	456	8093653933345128	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/BenchReport.cpp.obj	158beb2398af0876
-525	698	8093702277241177	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	c7fc58f5b3932e21
+760	932	8093985269733894	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340
 122	409	8093666094700628	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/SampleFramesData.cc.obj	cc5fea657857ce3
 116	778	8093666094644265	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/DecoderSimple.cc.obj	c513c385529de62c
 778	2872	8093666101271787	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestProfileLevel.cc.obj	4276bdfa1d676b04
@@ -135,17 +135,24 @@
 246	419	8093667359834331	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/gtest_main.dll	6e89ed076e6ea81e
 246	419	8093667359834331	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/gtest_main.lib	6e89ed076e6ea81e
 69	692	8093667356584656	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestGcCuda.cc.obj	4262f6cef8c16a5e
-64	772	8093667356537473	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDwtCuda.cc.obj	9eef344799852ac0
-939	1162	8093697273091763	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	7b0eec4315787516
+65	737	8093990603238015	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDwtCuda.cc.obj	9eef344799852ac0
+52	318	8093983210357076	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	a48ec7a9a41966fb
 48	1765	8093694820504305	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/RcQuantCuda.cu.obj	2a4aa347ed8a6be3
 55	885	8093694820581890	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestRcQuantCuda.cc.obj	7270c12a032db32a
 63	939	8093697264325157	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestPackCuda.cc.obj	826d24fe25f42a1c
 48	2204	8093982417511077	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/FrameContextCuda.cu.obj	8e85317b4bc3be0e
 37	2687	8093982417407362	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/EncodeFrameCuda.cu.obj	810c1a304f80c889
-51	253	8093982980062543	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
-51	253	8093982980062543	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
 47	1077	8093983121774458	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestEncodeFrameCuda.cc.obj	752253ac5f7d3e8a
-52	318	8093983210357076	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	a48ec7a9a41966fb
-45	759	8093985262590161	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/main.cpp.obj	4ac61ce05a884daa
-760	932	8093985269733894	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340
-65	737	8093990603238015	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDwtCuda.cc.obj	9eef344799852ac0
+48	2904	8093992741713946	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/CudaSmokeTest.cu.obj	28b90dbb7363ba92
+86	3085	8093992742074363	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/NltCuda.cu.obj	43cc90aa7a188a9d
+77	3124	8093992742003874	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/GcCuda.cu.obj	cac6ccfa4366fca8
+57	3155	8093992741797498	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+91	3359	8093992742105170	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/PackCuda.cu.obj	8036472e8b841523
+71	3418	8093992741941707	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/FrameContextCuda.cu.obj	72e5d8d354851429
+98	3765	8093992742210235	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/RcQuantCuda.cu.obj	7efd23fc5288f4f5
+64	4179	8093992741878769	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/EncodeFrameCuda.cu.obj	e7422e4613ab37ce
+4180	4350	8093992782997476	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+4180	4350	8093992782997476	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+4351	4563	8093992784740378	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	a48ec7a9a41966fb
+44	729	8093994644985988	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/main.cpp.obj	4ac61ce05a884daa
+730	902	8093994651841272	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340

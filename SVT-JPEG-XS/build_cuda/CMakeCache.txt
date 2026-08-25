@@ -68,7 +68,7 @@ CMAKE_BUILD_TYPE:STRING=Release
 CMAKE_CUDA_COMPILER:STRING=C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/bin/nvcc.exe
 
 //Flags used by the CUDA compiler during all build types.
-CMAKE_CUDA_FLAGS:STRING=-D_WINDOWS -Xcompiler="/W3 /GR /EHsc"
+CMAKE_CUDA_FLAGS:STRING=-ccbin="C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64"
 
 //Flags used by the CUDA compiler during DEBUG builds.
 CMAKE_CUDA_FLAGS_DEBUG:STRING=-Xcompiler="-MDd  -Zi -Ob0 -Od /RTC1"
@@ -81,6 +81,9 @@ CMAKE_CUDA_FLAGS_RELEASE:STRING=-Xcompiler="-MD -O2 -Ob2" -DNDEBUG
 
 //Flags used by the CUDA compiler during RELWITHDEBINFO builds.
 CMAKE_CUDA_FLAGS_RELWITHDEBINFO:STRING=-Xcompiler="-MD  -Zi -O2 -Ob1" -DNDEBUG
+
+//No help, variable specified on the command line.
+CMAKE_CUDA_HOST_COMPILER:UNINITIALIZED=C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe
 
 //Libraries linked by default with all CUDA applications.
 CMAKE_CUDA_STANDARD_LIBRARIES:STRING=kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib

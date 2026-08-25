@@ -183,6 +183,40 @@ precinctバイト長など)をダンプし、CUDAカーネルの出力とビッ�
            実運用スレッドパイプライン(EncHandle.c)への配線(置き換え)は対象外とする。
            詳細は計画ファイル(セクション11参照)のPhase 4節を参照。
 
+           [Phase 4a完了] `Source/Lib/Encoder/CUDA/{FrameContextCuda,EncodeFrameCuda}.cu/.cuh`
+           実装。当初計画していた「DWTピラミッド出力→precinct×band×lineレイアウトへの
+           gather/scatterカーネル」は不要と判明(pi_band_tのx/y/width/height座標がそのまま
+           DWT出力バッファ内の係数アドレッシングに使えたため)。この結果GC/RC-LUT構築/量子化は
+           「1 launch=1precinct」(約540/frame)ではなく「1 launch=1band」(約90/frame)という、
+           計画時点の想定より粗い粒度でのバッチ化になった(precinct単位の依存が無いことは
+           Phase2で確認済みのため正しさに影響なし)。bit-exact: `*Cuda*`テスト20/20 pass
+           (既存18件は無改造・無回帰、新規end-to-endテスト2件[小規模+実サイズ4K/10bit]が
+           実際の`svt_jpeg_xs_encoder_send_picture()`/`get_packet()`出力とbit-exact一致)。
+           回帰: 全12057件中12055件パス(既存2件スキップのみ、回帰ゼロ)。
+           DWT自体はPhase1の呼び出し毎malloc/free版のまま未改修(Phase4bの最有力対象、
+           詳細はセクション10参照)。end-to-end検証はslice_height=画像高さ・
+           rate_control_mode=RC_CBR_PER_PRECINCT(共に実運用でサポートされる設定だが
+           デフォルトではない)という2点の設定narrowingを行った——move paddingモード
+           (デフォルト)はprecinct間の真の逐次依存を持ち、事前計算budget_bytesに基づく
+           バッチ設計と非互換なため。既存Phase1〜3の単一precinct向けAPIはmalloc/free撤廃
+           リファクタリングを行わず無改造のまま維持し(既存テストへのリスクをゼロに保つため)、
+           新しいフレーム単位バッチ経路は既存APIへの「追加」とした。詳細は計画ファイル
+           (セクション11)のPhase 4a完了サマリを参照。
+
+           [Phase 4b方針] 実測(CUDA 40.67ms vs CPUシングルスレッド23.17ms、セクション10参照)
+           の主因の筆頭がDWT未改修と判明したため、4bはさらに「4b-1: DWT永続バッファ対応化のみ
+           先行実装・計測」「4b-2: CUDA Graph化+プロファイリング(4b-1の結果を見てから着手
+           判断)」の2小ステップに分割する。まず4b-1のみ着手し、実測値を見てから4b-2へ進むかを
+           判断する。詳細は計画ファイル(セクション11)のPhase 4bを参照。
+
+           [Phase 4b-1完了] `DwtCuda.cu`に新規`svt_cuda_dwt_component_ctx()`を追加(既存
+           `svt_cuda_dwt_component()`は無改造)、永続デバイスバッファ+ストリームを使い呼び出し毎
+           malloc/free・ホストラウンドトリップを撤廃。bit-exact: `*Cuda*`テスト20/20 pass
+           (無回帰)。全回帰: 12057件中12055件パス(既存2件スキップのみ)。実測: CUDA full-frame
+           40.67ms→19.98ms(約51%短縮)、CPU参照22.76ms(再計測)。**CUDA版がCPUシングルスレッド
+           版を上回り、33ms現実目標は達成、16ms理想目標は未達**。詳細は計画ファイル
+           (セクション11)のPhase 4b-1完了サマリを参照。
+
   [実装上の追加発見] 実際のパイプライン構造は上記の8段階のような独立ステージ
   分割ではなく、「Init(1スレッド) -> Dwt(CPU_PROFILE_CPU時のみ、component単位の
   別スレッドプール) -> Pack(DWT[LOW_LATENCY時はここでインライン計算]+GC+
@@ -271,6 +305,34 @@ Phaseが進むごとに「元のCリファレンス実装」と「CUDA実装」�
   よりもこの制約を正直に記録して先へ進むことを優先した。
   bit-exact検証: `TestPackCuda.cc` 5/5 pass(ランダム入力・4K幅precinct実サイズケース含む)。
   回帰: 既存UnitTests 12053件パス(CPU-onlyビルド)。
+
+  Phase 4a実装後の実行結果(4K・10bit・3840x2160、永続`SvtCudaFrameContext`使い回し、
+  20回試行平均、ホスト可視レイテンシ):
+    Encode(CUDA, full frame)                    GPU  mean ~40.67ms
+    Encode(CPU reference, full frame, single-threaded) CPU  mean ~23.17ms
+  → **現時点でCUDA版はシングルスレッドCPU版より遅い**(16ms/33ms目標のいずれにも未達)。
+  主因(影響度順、隠さず記録): (1) NLT+DWTが今回のスコープ外のためPhase1の未改造・呼び出し毎
+  malloc/free版のまま(~12ms、ホストラウンドトリップ込み)、(2) CUDA Graph未導入のため1フレーム
+  あたり360超の小カーネル起動オーバーヘッドが蓄積、(3) gtli scatterやLUTコピーバック等の細かい
+  H2D/D2H転送が残存。GC/RC-LUT構築/量子化は「1 launch=1band」(約90/frame)へバッチ化済みで
+  Phase2の素朴な「1 launch=1precinct」(540/frame)からは大幅に launch数を削減できているが、
+  DWTの未最適化とGraph未導入のオーバーヘッドがまだ支配的。**Phase4bの最優先対象はDWTの永続
+  バッファ対応化**、次点でCUDA Graph化。
+  bit-exact検証: `TestEncodeFrameCuda.cc` 2/2 pass(小規模フィクスチャ+実サイズ4K/10bit、
+  実際の`svt_jpeg_xs_encoder_send_picture()`/`get_packet()`出力とバイト列全体memcmp一致)。
+  `*Cuda*`テスト計20/20 pass。回帰: 全12057件中12055件パス(既存2件スキップのみ、回帰ゼロ)。
+
+  Phase 4b-1実装後の実行結果(4K・10bit・3840x2160、同一条件で再計測、20回試行平均、
+  ホスト可視レイテンシ):
+    Encode(CUDA, full frame)                    GPU  mean ~19.98ms (Phase4aの40.67msから改善)
+    Encode(CPU reference, full frame, single-threaded) CPU  mean ~22.76ms (再計測値)
+  → DWTの呼び出し毎malloc/free+ホストラウンドトリップ(D2H→H2D)を、`SvtCudaFrameContext`の
+  永続バッファへ直接書き込む方式に置き換えた結果、フレーム全体レイテンシが約51%短縮された。
+  **これによりCUDA版がCPUシングルスレッド版を初めて上回り、33ms現実目標を達成した
+  (16ms理想目標はまだ未達)**。残るオーバーヘッドの内訳(CUDA Graph未導入による小カーネル
+  起動オーバーヘッド、細かいH2D/D2H転送)はPhase4b-2で検証予定。
+  bit-exact検証: `*Cuda*`テスト20/20 pass(`TestEncodeFrameCuda.cc`含め無回帰)。
+  回帰: 全12057件中12055件パス(既存2件スキップのみ、回帰ゼロ)。
 
 --------------------------------------------------
 11. 実装計画ドキュメントの所在
