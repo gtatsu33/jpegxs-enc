@@ -1,0 +1,392 @@
+name: Base Build
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Build even if no relevant paths changed'
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  LINUX_ARTIFACTS: linux-build-${{ github.run_number }}
+  WINDOWS_ARTIFACTS: win-build-${{ github.run_number }}
+  JOBS_NUM: 100
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      # 'force' is a workflow_dispatch checkbox that skips the path filter. dispatch
+      # inputs arrive as strings, so compare against 'true' rather than the boolean.
+      changed: ${{ steps.filter.outputs.base_build == 'true' || github.event.inputs.force == 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          filters: .github/config/path_filters.yaml
+
+  linux-build:
+    needs: changes
+    if: ${{ needs.changes.outputs.changed == 'true' }}
+    runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+    outputs:
+      artifact_name: ${{ env.LINUX_ARTIFACTS }}
+    steps:
+    - name: 'Harden Runner'
+      uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      with:
+        egress-policy: audit
+
+    - name: 'Checkout repository'
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: 'Setup:  Install dependencies'
+      working-directory: Build/linux
+      run: |
+           sudo apt-get update
+           sudo apt-get -y install cmake nasm valgrind make gcc g++
+
+    - name: 'Build:  Debug and Release versions, install Release tree (reused by ffmpeg/gstreamer/fuzzy-test workflows)'
+      working-directory: Build/linux
+      run: |
+        ./build.sh --jobs=10 --all --test install --prefix "${{ github.workspace }}/install-dir"
+
+    - name: "Archive: upload artifacts"
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: "${{ env.LINUX_ARTIFACTS }}"
+        retention-days: 30
+        path: |
+          Bin/
+          tests/scripts/parrallelUT.sh
+          tests/scripts/
+
+    - name: "Archive: upload installed svt-jpegxs tree (fixed name, consumed cross-workflow via workflow_run)"
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: linux-svtjpegxs-install
+        retention-days: 1
+        path: |
+          install-dir/
+
+  linux-unit-tests-release:
+    needs: linux-build
+    runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+    timeout-minutes: 120
+    steps:
+    - name: 'Harden Runner'
+      uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      with:
+        egress-policy: audit
+
+    - name: 'Setup:  Install dependencies'
+      run: |
+           sudo apt-get update
+           sudo apt-get -y install cmake nasm valgrind make gcc g++
+
+    - name: download build artifacts
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: "${{ env.LINUX_ARTIFACTS }}"
+
+    - name: 'Unit tests: Release'
+      run: |
+        echo "Number of processors: ${NPROC}"
+        cd Bin/Release/
+        ls -l
+        sudo chmod +x ${{ github.workspace }}/tests/scripts/parrallelUT.sh
+        sudo chmod +x ${{ github.workspace }}/Bin/Release/*
+        export LD_LIBRARY_PATH=$(pwd)
+        ${{ github.workspace }}/tests/scripts/parrallelUT.sh ./SvtJpegxsUnitTests ${{ env.JOBS_NUM }}
+
+  linux-unit-tests-debug:
+    needs: linux-build
+    runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+    timeout-minutes: 120
+    steps:
+    - name: 'Harden Runner'
+      uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      with:
+        egress-policy: audit
+
+    - name: 'Setup:  Install dependencies'
+      run: |
+           sudo apt-get update
+           sudo apt-get -y install cmake nasm valgrind make gcc g++
+
+    - name: download build artifacts
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: "${{ env.LINUX_ARTIFACTS }}"
+
+    - name: 'Unit tests: Debug'
+      run: |
+        echo "Number of processors: ${NPROC}"
+        cd Bin/Debug/
+        ls -l
+        sudo chmod +x ${{ github.workspace }}/tests/scripts/parrallelUT.sh
+        sudo chmod +x ${{ github.workspace }}/Bin/Debug/*
+        export LD_LIBRARY_PATH=$(pwd)
+        ${{ github.workspace }}/tests/scripts/parrallelUT.sh ./SvtJpegxsUnitTests ${{ env.JOBS_NUM }}
+
+  linux-unit-tests-valgrind:
+    needs: linux-build
+    runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+    timeout-minutes: 120
+    steps:
+    - name: 'Harden Runner'
+      uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      with:
+        egress-policy: audit
+
+    - name: 'Setup: Cleanup workspace'
+      run: |
+        rm -rf ./* || true
+        rm -rf ./.??* || true
+        ls -la ./
+
+    - name: 'Setup: Install dependencies'
+      run: |
+           sudo apt-get update
+           sudo apt-get -y install cmake nasm valgrind make gcc g++
+
+    - name: 'Setup: Download build artifacts'
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: "${{ env.LINUX_ARTIFACTS }}"
+
+    - name: 'Unit tests: Release with valgrind'
+      run: |
+        cd Bin/Release/
+        ls -l
+        sudo chmod +x ${{ github.workspace }}/tests/scripts/parrallelUT.sh
+        sudo chmod +x ${{ github.workspace }}/Bin/Release/*
+        export LD_LIBRARY_PATH=$(pwd)
+        ${{ github.workspace }}/tests/scripts/parrallelUT.sh ./SvtJpegxsUnitTests ${{ env.JOBS_NUM }} valgrind
+
+  linux-conformance-tests:
+    needs: linux-build
+    runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+    timeout-minutes: 120
+    steps:
+    - name: 'Harden Runner'
+      uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      with:
+        egress-policy: audit
+
+    - name: 'Setup: Install dependencies'
+      run: |
+           sudo apt-get update
+           sudo apt-get -y install cmake nasm valgrind make gcc g++
+
+    - name: 'Setup: Download build artifacts'
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: "${{ env.LINUX_ARTIFACTS }}"
+
+    - name: 'Conformance tests: Release'
+      working-directory: ${{ github.workspace }}/tests/scripts
+      run: |
+        sudo chmod -R 755 ${GITHUB_WORKSPACE}/tests/scripts/
+        sudo chmod -R 755 ${DEC_BIN_DIR}/
+        export LD_LIBRARY_PATH=${DEC_BIN_DIR}
+        ./ParallelAllTests.sh ${{ env.JOBS_NUM }}  ${INPUT_FILES_PATH} ${DEC_BIN_DIR}/SvtJpegxsDecApp 2>&1 | tee conformance_tests.log
+      env:
+        DEC_BIN_DIR: ${{ github.workspace }}/Bin/Release
+        INPUT_FILES_PATH: /opt/samples
+
+    - name: 'Publish: sample app functional test summary'
+      if: always()
+      working-directory: ${{ github.workspace }}/tests/scripts
+      run: |
+        {
+          echo "## SVT-JPEG-XS App Functional Tests"
+          echo ""
+          if [ ! -f conformance_tests.log ]; then
+            echo "> ⚠️ Test log not found — the test may not have run."
+          else
+            echo "| Suite | Executed | Passed | Failed | Status |"
+            echo "|-------|----------|--------|--------|--------|"
+            awk '
+              /^RUN DECODER CONFORMANCE TEST/ { flush(); suite="Decoder Conformance" }
+              /^RUN DECODER MULTI FRAMES TEST/ { flush(); suite="Decoder Multi-Frames" }
+              /^RUN ENOCDER TEST/             { flush(); suite="Encoder" }
+              /Tests execute:/  { total += $3 }
+              /^FAIL [^!]/      { fails++ }
+              END {
+                flush()
+                print ""
+                if (grand_fails == 0)
+                  print "**Result: ✅ All " grand_total " tests passed**"
+                else
+                  print "**Result: ❌ " grand_fails " test(s) failed, " (grand_total - grand_fails) " passed**"
+              }
+              function flush() {
+                if (suite != "") {
+                  icon = (fails == 0) ? "✅" : "❌"
+                  printf "| %s | %d | %d | %d | %s |\n", suite, total, total-fails, fails, icon
+                  grand_total += total; grand_fails += fails
+                  total=0; fails=0; suite=""
+                }
+              }
+            ' conformance_tests.log
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+  performance-tests:
+    needs: linux-build
+    runs-on: ['self-hosted', 'linux', 'x64', 'valgrind', 'jpeg-perf']
+    timeout-minutes: 120
+    env:
+      INPUT_FILES_PATH: /opt/samples
+    steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Setup: Install dependencies'
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install numactl
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: 'Setup: Download build artifacts'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.linux-build.outputs.artifact_name }}
+
+      - name: 'Run: SvtJpegxsEncApp/SvtJpegxsDecApp performance'
+        working-directory: tests/scripts
+        run: |
+          chmod +x "${{ github.workspace }}/Bin/Release/"*
+          ./PerformanceTestSampleApp.sh "${{ env.INPUT_FILES_PATH }}" 2>&1 | tee sample_app_performance.log
+
+      - name: 'Publish: sample app performance summary'
+        if: always()
+        working-directory: tests/scripts
+        run: |
+          {
+            echo "## SVT-JPEG-XS Sample App Performance Results"
+            echo ""
+            if [ ! -f svt_app_results.csv ]; then
+              echo "> ⚠️ Results CSV not found — the test may not have produced output."
+            else
+              echo "| Op | Resolution / Config | Result FPS | Baseline FPS | % of Target | Status |"
+              echo "|----|---------------------|-----------|--------------|-------------|--------|"
+              awk -F',' '
+                NR == 1 { next }
+                {
+                  op=$1; tc=$2; status=$NF; pct=$(NF-1); target=$(NF-2); result=$(NF-3)
+                  n=split(tc, a, "|")
+                  label = (n > 7) ? a[1] " bpp=" a[7] " t=" a[8] : tc
+                  icon = (status == "PASS") ? "✅" : "❌"
+                  printf "| %s | %s | %s | %s | %s%% | %s %s |\n", op, label, result, target, pct, icon, status
+                  if (status == "PASS") pass++; else fail++
+                }
+                END {
+                  print ""
+                  if (fail+pass == 0)
+                    print "_No test results found in CSV._"
+                  else if (fail == 0)
+                    print "**Result: ✅ All " pass " tests passed**"
+                  else
+                    print "**Result: ❌ " fail " test(s) failed, " pass " passed**"
+                }
+              ' svt_app_results.csv
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Archive: upload performance results"
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sample-app-performance-results-${{ github.run_number }}
+          retention-days: 90
+          path: |
+            tests/scripts/svt_app_results.csv
+            tests/scripts/sample_app_performance.log
+
+  windows-build:
+    needs: changes
+    if: ${{ needs.changes.outputs.changed == 'true' }}
+    runs-on: 'windows-2022'
+    timeout-minutes: 120
+    env:
+      YASM_PATH: C:\Yasm
+    steps:
+    - name: 'Harden Runner'
+      uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      with:
+        egress-policy: audit
+
+    - name: 'Checkout repository'
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: 'Install dependencies'
+      working-directory: "${{ github.workspace }}"
+      shell: pwsh
+      run: .\.github\scripts\configure.ps1
+
+    - name: 'Build'
+      working-directory: Build/windows
+      shell: cmd
+      env:
+        ASM_NASM: ${{ env.YASM_PATH }}\yasm.exe
+      run: |
+        call .\build.bat 2022 release test
+        call .\build.bat 2022 debug  test
+
+    - name: upload artifacts
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        retention-days: 30
+        name: ${{ env.WINDOWS_ARTIFACTS }}
+        path: |
+          Bin/
+          tests/scripts/parrallelUT.sh
+
+  windows-unit-tests:
+    needs: windows-build
+    runs-on: 'windows-2022'
+    timeout-minutes: 120
+    steps:
+    - name: 'Harden Runner'
+      uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      with:
+        egress-policy: audit
+
+    - name: download build artifacts
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: ${{ env.WINDOWS_ARTIFACTS }}
+
+    - name: 'Unit tests: Release'
+      run: |
+        ls
+        NPROC=$(cat /proc/cpuinfo | grep processor | wc -l)
+        echo "Number of processors: ${NPROC}"
+        mv tests/scripts/parrallelUT.sh Bin/Release
+        chmod +x Bin/Release/*
+        cd Bin/Release/
+        ./parrallelUT.sh ./SvtJpegxsUnitTests.exe ${NPROC}

@@ -1,0 +1,1348 @@
+name: ffmpeg Plugin Build
+
+on:
+  workflow_run:
+    workflows: ["Base Build"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Build even if no relevant paths changed'
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
+env:
+  INPUT_FILES_PATH: /opt/samples
+  JOBS_NUM: 100
+  FFMPEG_SRC_ARTIFACT: ffmpeg-source-${{ github.run_number }}
+  LINUX_LIB_ARTIFACTS: linux-svtjpegxs-lib-build-${{ github.run_number }}
+  LINUX_ARTIFACTS_6_1: linux-ffmpeg-6-1-build-${{ github.run_number }}
+  LINUX_ARTIFACTS_7_0: linux-ffmpeg-7-0-build-${{ github.run_number }}
+  LINUX_ARTIFACTS_7_1: linux-ffmpeg-7-1-build-${{ github.run_number }}
+  LINUX_ARTIFACTS_8_0: linux-ffmpeg-8-0-build-${{ github.run_number }}
+  LINUX_ARTIFACTS_8_1: linux-ffmpeg-8-1-build-${{ github.run_number }}
+  LINUX_ARTIFACTS_9_0: linux-ffmpeg-9-0-build-${{ github.run_number }}
+  WINDOWS_LIB_ARTIFACTS: windows-svtjpegxs-mingw-lib-build-${{ github.run_number }}
+  WINDOWS_ARTIFACTS_6_1: windows-ffmpeg-6-1-build-${{ github.run_number }}
+  WINDOWS_ARTIFACTS_7_0: windows-ffmpeg-7-0-build-${{ github.run_number }}
+  WINDOWS_ARTIFACTS_7_1: windows-ffmpeg-7-1-build-${{ github.run_number }}
+  WINDOWS_ARTIFACTS_8_0: windows-ffmpeg-8-0-build-${{ github.run_number }}
+  WINDOWS_ARTIFACTS_8_1: windows-ffmpeg-8-1-build-${{ github.run_number }}
+  WINDOWS_ARTIFACTS_9_0: windows-ffmpeg-9-0-build-${{ github.run_number }}
+jobs:
+  changes:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      # 'force' is a workflow_dispatch checkbox that skips the path filter. dispatch
+      # inputs arrive as strings, so compare against 'true' rather than the boolean.
+      changed: ${{ steps.filter.outputs.ffmpeg_plugin_build == 'true' || github.event.inputs.force == 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          filters: .github/config/path_filters.yaml
+
+
+  ffmpeg-source-fetch:
+      needs: changes
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'ubuntu-22.04'
+      timeout-minutes: 30
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Fetch: all 6 FFmpeg release branches once, reused by every linux/windows ffmpeg-plugin build job'
+        run: |
+          mkdir ffmpeg-source
+          cd ffmpeg-source
+          git init -q
+          git remote add origin https://github.com/FFmpeg/FFmpeg.git
+          for v in 6.1 7.0 7.1 8.0 8.1 9.0; do
+            fetch_attempt=1
+            max_fetch_attempts=5
+            until git fetch --depth 1 origin "release/$v:release/$v"; do
+              if [[ "$fetch_attempt" -ge "$max_fetch_attempts" ]]; then
+                echo "git fetch release/$v failed after $max_fetch_attempts attempts, giving up."
+                exit 1
+              fi
+              fetch_attempt=$((fetch_attempt + 1))
+              echo "git fetch release/$v failed (attempt $((fetch_attempt - 1))/$max_fetch_attempts), retrying in 10s..."
+              sleep 10
+            done
+          done
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          retention-days: 1
+          include-hidden-files: true
+          path: |
+            ffmpeg-source/
+
+
+  linux-lib-build:
+      needs: changes
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'ubuntu-22.04'
+      timeout-minutes: 60
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Setup:  Install dependencies'
+        run: |
+            sudo apt-get update
+            sudo apt-get -y install cmake nasm make gcc g++ pkg-config
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact from Base Build (falls back to local build if missing)'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          name: linux-svtjpegxs-install
+          path: install-dir
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Build: SVT-JPEG-XS (shared, Release) once, reused by all ffmpeg-plugin linux jobs (skipped if reused from Base Build)'
+        working-directory: Build/linux
+        run: |
+          if find "${{ github.workspace }}/install-dir" -name 'SvtJpegxs.pc' 2>/dev/null | grep -q .; then
+            echo "Reusing svt-jpegxs artifact from Base Build workflow run, skipping rebuild."
+          else
+            ./build.sh install --prefix "${{ github.workspace }}/install-dir"
+          fi
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.LINUX_LIB_ARTIFACTS }}"
+          retention-days: 1
+          path: |
+            install-dir/
+
+  ffmpeg-6-1-linux-build:
+      needs: [changes, linux-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'ubuntu-22.04'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: 'Setup:  Install dependencies'
+        run: |
+            sudo apt-get update
+            sudo apt-get -y install cmake nasm make gcc g++ pkg-config
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Make svt-jpegxs artifact executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        run: .github/scripts/build_ffmpeg_plugin.sh 6.1 y
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_6_1 }}"
+          retention-days: 30
+          path: |
+            install-dir/
+
+  ffmpeg-7-0-linux-build:
+      needs: [changes, linux-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'ubuntu-22.04'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Setup:  Install dependencies'
+        run: |
+            sudo apt-get update
+            sudo apt-get -y install cmake nasm make gcc g++ pkg-config
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Make svt-jpegxs artifact executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        run: .github/scripts/build_ffmpeg_plugin.sh 7.0 y
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_7_0 }}"
+          retention-days: 30
+          path: |
+            install-dir/
+
+  ffmpeg-7-1-linux-build:
+      needs: [changes, linux-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'ubuntu-22.04'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Setup:  Install dependencies'
+        run: |
+            sudo apt-get update
+            sudo apt-get -y install cmake nasm make gcc g++ pkg-config
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Make svt-jpegxs artifact executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        run: .github/scripts/build_ffmpeg_plugin.sh 7.1 y
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_7_1 }}"
+          retention-days: 30
+          path: |
+            install-dir/
+
+  ffmpeg-8-0-linux-build:
+      needs: [changes, linux-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'ubuntu-22.04'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Setup:  Install dependencies'
+        run: |
+            sudo apt-get update
+            sudo apt-get -y install cmake nasm make gcc g++ pkg-config
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Make svt-jpegxs artifact executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        run: .github/scripts/build_ffmpeg_plugin.sh 8.0 y
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_8_0 }}"
+          retention-days: 30
+          path: |
+            install-dir/
+
+  ffmpeg-8-1-linux-build:
+      needs: [changes, linux-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'ubuntu-22.04'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Setup:  Install dependencies'
+        run: |
+            sudo apt-get update
+            sudo apt-get -y install cmake nasm make gcc g++ pkg-config
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Make svt-jpegxs artifact executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        run: .github/scripts/build_ffmpeg_plugin.sh 8.1 y n
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_8_1 }}"
+          retention-days: 30
+          path: |
+            install-dir/
+
+  ffmpeg-9-0-linux-build:
+      needs: [changes, linux-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'ubuntu-22.04'
+      timeout-minutes: 120
+      outputs:
+        artifact_name: ${{ env.LINUX_ARTIFACTS_9_0 }}
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Setup:  Install dependencies'
+        run: |
+            sudo apt-get update
+            sudo apt-get -y install cmake nasm make gcc g++ pkg-config
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Make svt-jpegxs artifact executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        run: .github/scripts/build_ffmpeg_plugin.sh 9.0 y n
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_9_0 }}"
+          retention-days: 30
+          path: |
+            install-dir/
+
+  # ---------------------------------------------------------------------------------------------
+  # ffmpeg plugin functional tests (tests/scripts/FFmpegDecoderConformanceTest.sh,
+  # FFmpegDecoderMultiFramesTest.sh, FFmpegEncoderTest.sh), run against the ffmpeg binary built by
+  # the corresponding *-linux-build job above, one job per Linux ffmpeg version. Runs on the same
+  # self-hosted runners (with the same pre-staged /opt/samples bitstream set) as base_build.yaml's
+  # linux-conformance-tests job, since these test scripts consume the exact same asset layout
+  # (test_bitsreams/, reference_decode/, bitstream_multi_frames/, bitstream_invalid/,
+  # encoder_tests/).
+  # ---------------------------------------------------------------------------------------------
+
+  ffmpeg-6-1-linux-tests:
+      needs: [changes, ffmpeg-6-1-linux-build]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download build artifacts'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_6_1 }}"
+          path: install-dir
+
+      - name: 'Setup: Make ffmpeg executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'ffmpeg plugin tests: run all'
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          export LD_LIBRARY_PATH="${{ github.workspace }}/install-dir/lib"
+          ./ParallelAllFFmpegTests.sh ${{ env.JOBS_NUM }} "${{ env.INPUT_FILES_PATH }}" "${{ github.workspace }}/install-dir/bin/ffmpeg" dec 2>&1 | tee ffmpeg_functional_tests.log
+
+      - name: 'Publish: FFmpeg functional test summary'
+        if: always()
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          {
+            echo "## FFmpeg Plugin Functional Tests"
+            echo ""
+            if [ ! -f ffmpeg_functional_tests.log ]; then
+              echo "> ⚠️ Test log not found — the test may not have run."
+            else
+              echo "| Suite | Executed | Passed | Failed | Status |"
+              echo "|-------|----------|--------|--------|--------|"
+              awk '
+                /^RUN FFMPEG DECODER CONFORMANCE TEST/ { flush(); suite="Decoder Conformance" }
+                /^RUN FFMPEG DECODER MULTI FRAMES TEST/ { flush(); suite="Decoder Multi-Frames" }
+                /^RUN FFMPEG ENCODER TEST/             { flush(); suite="Encoder" }
+                /Tests execute:/  { total += $3 }
+                /^FAIL [^!]/      { fails++ }
+                END {
+                  flush()
+                  print ""
+                  if (grand_fails == 0)
+                    print "**Result: ✅ All " grand_total " tests passed**"
+                  else
+                    print "**Result: ❌ " grand_fails " test(s) failed, " (grand_total - grand_fails) " passed**"
+                }
+                function flush() {
+                  if (suite != "") {
+                    icon = (fails == 0) ? "✅" : "❌"
+                    printf "| %s | %d | %d | %d | %s |\n", suite, total, total-fails, fails, icon
+                    grand_total += total; grand_fails += fails
+                    total=0; fails=0; suite=""
+                  }
+                }
+              ' ffmpeg_functional_tests.log
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ffmpeg-7-0-linux-tests:
+      needs: [changes, ffmpeg-7-0-linux-build]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download build artifacts'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_7_0 }}"
+          path: install-dir
+
+      - name: 'Setup: Make ffmpeg executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'ffmpeg plugin tests: run all'
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          export LD_LIBRARY_PATH="${{ github.workspace }}/install-dir/lib"
+          ./ParallelAllFFmpegTests.sh ${{ env.JOBS_NUM }} "${{ env.INPUT_FILES_PATH }}" "${{ github.workspace }}/install-dir/bin/ffmpeg" dec 2>&1 | tee ffmpeg_functional_tests.log
+
+      - name: 'Publish: FFmpeg functional test summary'
+        if: always()
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          {
+            echo "## FFmpeg Plugin Functional Tests"
+            echo ""
+            if [ ! -f ffmpeg_functional_tests.log ]; then
+              echo "> ⚠️ Test log not found — the test may not have run."
+            else
+              echo "| Suite | Executed | Passed | Failed | Status |"
+              echo "|-------|----------|--------|--------|--------|"
+              awk '
+                /^RUN FFMPEG DECODER CONFORMANCE TEST/ { flush(); suite="Decoder Conformance" }
+                /^RUN FFMPEG DECODER MULTI FRAMES TEST/ { flush(); suite="Decoder Multi-Frames" }
+                /^RUN FFMPEG ENCODER TEST/             { flush(); suite="Encoder" }
+                /Tests execute:/  { total += $3 }
+                /^FAIL [^!]/      { fails++ }
+                END {
+                  flush()
+                  print ""
+                  if (grand_fails == 0)
+                    print "**Result: ✅ All " grand_total " tests passed**"
+                  else
+                    print "**Result: ❌ " grand_fails " test(s) failed, " (grand_total - grand_fails) " passed**"
+                }
+                function flush() {
+                  if (suite != "") {
+                    icon = (fails == 0) ? "✅" : "❌"
+                    printf "| %s | %d | %d | %d | %s |\n", suite, total, total-fails, fails, icon
+                    grand_total += total; grand_fails += fails
+                    total=0; fails=0; suite=""
+                  }
+                }
+              ' ffmpeg_functional_tests.log
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ffmpeg-7-1-linux-tests:
+      needs: [changes, ffmpeg-7-1-linux-build]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download build artifacts'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_7_1 }}"
+          path: install-dir
+
+      - name: 'Setup: Make ffmpeg executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'ffmpeg plugin tests: run all'
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          export LD_LIBRARY_PATH="${{ github.workspace }}/install-dir/lib"
+          ./ParallelAllFFmpegTests.sh ${{ env.JOBS_NUM }} "${{ env.INPUT_FILES_PATH }}" "${{ github.workspace }}/install-dir/bin/ffmpeg" dec 2>&1 | tee ffmpeg_functional_tests.log
+
+      - name: 'Publish: FFmpeg functional test summary'
+        if: always()
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          {
+            echo "## FFmpeg Plugin Functional Tests"
+            echo ""
+            if [ ! -f ffmpeg_functional_tests.log ]; then
+              echo "> ⚠️ Test log not found — the test may not have run."
+            else
+              echo "| Suite | Executed | Passed | Failed | Status |"
+              echo "|-------|----------|--------|--------|--------|"
+              awk '
+                /^RUN FFMPEG DECODER CONFORMANCE TEST/ { flush(); suite="Decoder Conformance" }
+                /^RUN FFMPEG DECODER MULTI FRAMES TEST/ { flush(); suite="Decoder Multi-Frames" }
+                /^RUN FFMPEG ENCODER TEST/             { flush(); suite="Encoder" }
+                /Tests execute:/  { total += $3 }
+                /^FAIL [^!]/      { fails++ }
+                END {
+                  flush()
+                  print ""
+                  if (grand_fails == 0)
+                    print "**Result: ✅ All " grand_total " tests passed**"
+                  else
+                    print "**Result: ❌ " grand_fails " test(s) failed, " (grand_total - grand_fails) " passed**"
+                }
+                function flush() {
+                  if (suite != "") {
+                    icon = (fails == 0) ? "✅" : "❌"
+                    printf "| %s | %d | %d | %d | %s |\n", suite, total, total-fails, fails, icon
+                    grand_total += total; grand_fails += fails
+                    total=0; fails=0; suite=""
+                  }
+                }
+              ' ffmpeg_functional_tests.log
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ffmpeg-8-0-linux-tests:
+      needs: [changes, ffmpeg-8-0-linux-build]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download build artifacts'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_8_0 }}"
+          path: install-dir
+
+      - name: 'Setup: Make ffmpeg executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'ffmpeg plugin tests: run all'
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          export LD_LIBRARY_PATH="${{ github.workspace }}/install-dir/lib"
+          ./ParallelAllFFmpegTests.sh ${{ env.JOBS_NUM }} "${{ env.INPUT_FILES_PATH }}" "${{ github.workspace }}/install-dir/bin/ffmpeg" dec 2>&1 | tee ffmpeg_functional_tests.log
+
+      - name: 'Publish: FFmpeg functional test summary'
+        if: always()
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          {
+            echo "## FFmpeg Plugin Functional Tests"
+            echo ""
+            if [ ! -f ffmpeg_functional_tests.log ]; then
+              echo "> ⚠️ Test log not found — the test may not have run."
+            else
+              echo "| Suite | Executed | Passed | Failed | Status |"
+              echo "|-------|----------|--------|--------|--------|"
+              awk '
+                /^RUN FFMPEG DECODER CONFORMANCE TEST/ { flush(); suite="Decoder Conformance" }
+                /^RUN FFMPEG DECODER MULTI FRAMES TEST/ { flush(); suite="Decoder Multi-Frames" }
+                /^RUN FFMPEG ENCODER TEST/             { flush(); suite="Encoder" }
+                /Tests execute:/  { total += $3 }
+                /^FAIL [^!]/      { fails++ }
+                END {
+                  flush()
+                  print ""
+                  if (grand_fails == 0)
+                    print "**Result: ✅ All " grand_total " tests passed**"
+                  else
+                    print "**Result: ❌ " grand_fails " test(s) failed, " (grand_total - grand_fails) " passed**"
+                }
+                function flush() {
+                  if (suite != "") {
+                    icon = (fails == 0) ? "✅" : "❌"
+                    printf "| %s | %d | %d | %d | %s |\n", suite, total, total-fails, fails, icon
+                    grand_total += total; grand_fails += fails
+                    total=0; fails=0; suite=""
+                  }
+                }
+              ' ffmpeg_functional_tests.log
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ffmpeg-8-1-linux-tests:
+      needs: [changes, ffmpeg-8-1-linux-build]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download build artifacts'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_8_1 }}"
+          path: install-dir
+
+      - name: 'Setup: Make ffmpeg executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'ffmpeg plugin tests: run all'
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          export LD_LIBRARY_PATH="${{ github.workspace }}/install-dir/lib"
+          ./ParallelAllFFmpegTests.sh ${{ env.JOBS_NUM }} "${{ env.INPUT_FILES_PATH }}" "${{ github.workspace }}/install-dir/bin/ffmpeg" dec 2>&1 | tee ffmpeg_functional_tests.log
+
+      - name: 'Publish: FFmpeg functional test summary'
+        if: always()
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          {
+            echo "## FFmpeg Plugin Functional Tests"
+            echo ""
+            if [ ! -f ffmpeg_functional_tests.log ]; then
+              echo "> ⚠️ Test log not found — the test may not have run."
+            else
+              echo "| Suite | Executed | Passed | Failed | Status |"
+              echo "|-------|----------|--------|--------|--------|"
+              awk '
+                /^RUN FFMPEG DECODER CONFORMANCE TEST/ { flush(); suite="Decoder Conformance" }
+                /^RUN FFMPEG DECODER MULTI FRAMES TEST/ { flush(); suite="Decoder Multi-Frames" }
+                /^RUN FFMPEG ENCODER TEST/             { flush(); suite="Encoder" }
+                /Tests execute:/  { total += $3 }
+                /^FAIL [^!]/      { fails++ }
+                END {
+                  flush()
+                  print ""
+                  if (grand_fails == 0)
+                    print "**Result: ✅ All " grand_total " tests passed**"
+                  else
+                    print "**Result: ❌ " grand_fails " test(s) failed, " (grand_total - grand_fails) " passed**"
+                }
+                function flush() {
+                  if (suite != "") {
+                    icon = (fails == 0) ? "✅" : "❌"
+                    printf "| %s | %d | %d | %d | %s |\n", suite, total, total-fails, fails, icon
+                    grand_total += total; grand_fails += fails
+                    total=0; fails=0; suite=""
+                  }
+                }
+              ' ffmpeg_functional_tests.log
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ffmpeg-9-0-linux-tests:
+      needs: [changes, ffmpeg-9-0-linux-build]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download build artifacts'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.LINUX_ARTIFACTS_9_0 }}"
+          path: install-dir
+
+      - name: 'Setup: Make ffmpeg executable'
+        run: sudo chmod -R 755 install-dir/
+
+      - name: 'ffmpeg plugin tests: run all'
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          export LD_LIBRARY_PATH="${{ github.workspace }}/install-dir/lib"
+          ./ParallelAllFFmpegTests.sh ${{ env.JOBS_NUM }} "${{ env.INPUT_FILES_PATH }}" "${{ github.workspace }}/install-dir/bin/ffmpeg" dec 2>&1 | tee ffmpeg_functional_tests.log
+
+      - name: 'Publish: FFmpeg functional test summary'
+        if: always()
+        working-directory: ${{ github.workspace }}/tests/scripts
+        run: |
+          {
+            echo "## FFmpeg Plugin Functional Tests"
+            echo ""
+            if [ ! -f ffmpeg_functional_tests.log ]; then
+              echo "> ⚠️ Test log not found — the test may not have run."
+            else
+              echo "| Suite | Executed | Passed | Failed | Status |"
+              echo "|-------|----------|--------|--------|--------|"
+              awk '
+                /^RUN FFMPEG DECODER CONFORMANCE TEST/ { flush(); suite="Decoder Conformance" }
+                /^RUN FFMPEG DECODER MULTI FRAMES TEST/ { flush(); suite="Decoder Multi-Frames" }
+                /^RUN FFMPEG ENCODER TEST/             { flush(); suite="Encoder" }
+                /Tests execute:/  { total += $3 }
+                /^FAIL [^!]/      { fails++ }
+                END {
+                  flush()
+                  print ""
+                  if (grand_fails == 0)
+                    print "**Result: ✅ All " grand_total " tests passed**"
+                  else
+                    print "**Result: ❌ " grand_fails " test(s) failed, " (grand_total - grand_fails) " passed**"
+                }
+                function flush() {
+                  if (suite != "") {
+                    icon = (fails == 0) ? "✅" : "❌"
+                    printf "| %s | %d | %d | %d | %s |\n", suite, total, total-fails, fails, icon
+                    grand_total += total; grand_fails += fails
+                    total=0; fails=0; suite=""
+                  }
+                }
+              ' ffmpeg_functional_tests.log
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ffmpeg-9-0-performance-tests:
+      needs: ffmpeg-9-0-linux-build
+      runs-on: ['self-hosted', 'linux', 'x64', 'valgrind', 'jpeg-perf']
+      timeout-minutes: 120
+      steps:
+        - name: 'Harden Runner'
+          uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+          with:
+            egress-policy: audit
+
+        - name: 'Setup: Install dependencies'
+          run: |
+            sudo apt-get update
+            sudo apt-get -y install numactl
+
+        - name: 'Checkout repository'
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+          with:
+            ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+            allow-unsafe-pr-checkout: true
+
+        - name: 'Setup: Download build artifacts'
+          uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+          with:
+            name: ${{ needs.ffmpeg-9-0-linux-build.outputs.artifact_name }}
+            path: install-dir
+
+        - name: 'Setup: Make ffmpeg executable'
+          run: sudo chmod -R 755 install-dir/
+
+        - name: 'Run: ffmpeg plugin performance'
+          working-directory: tests/scripts
+          run: |
+            export PATH="${{ github.workspace }}/install-dir/bin:$PATH"
+            export LD_LIBRARY_PATH="${{ github.workspace }}/install-dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            ffmpeg -hide_banner -encoders 2>&1 | grep -i libsvtjpegxs
+            ./PerformanceTestFfmpegPlugin.sh "${{ env.INPUT_FILES_PATH }}" 2>&1 | tee ffmpeg_plugin_performance.log
+
+        - name: 'Publish: ffmpeg plugin performance summary'
+          if: always()
+          working-directory: tests/scripts
+          run: |
+            {
+              echo "## FFmpeg Plugin Performance Results"
+              echo ""
+              if [ ! -f ffmpeg_results.csv ]; then
+                echo "> ⚠️ Results CSV not found — the test may not have produced output."
+              else
+                echo "| Op | Resolution / Config | Result FPS | Baseline FPS | % of Target | Status |"
+                echo "|----|---------------------|-----------|--------------|-------------|--------|"
+                awk -F',' '
+                  NR == 1 { next }
+                  {
+                    op=$1; tc=$2; status=$NF; pct=$(NF-1); target=$(NF-2); result=$(NF-3)
+                    n=split(tc, a, "|")
+                    label = (n > 7) ? a[1] " bpp=" a[7] " t=" a[8] : tc
+                    icon = (status == "PASS") ? "✅" : "❌"
+                    printf "| %s | %s | %s | %s | %s%% | %s %s |\n", op, label, result, target, pct, icon, status
+                    if (status == "PASS") pass++; else fail++
+                  }
+                  END {
+                    print ""
+                    if (fail+pass == 0)
+                      print "_No test results found in CSV._"
+                    else if (fail == 0)
+                      print "**Result: ✅ All " pass " tests passed**"
+                    else
+                      print "**Result: ❌ " fail " test(s) failed, " pass " passed**"
+                  }
+                ' ffmpeg_results.csv
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+
+        - name: "Archive: upload performance results"
+          if: always()
+          uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+          with:
+            name: ffmpeg-plugin-performance-results-${{ github.run_number }}
+            retention-days: 90
+            path: |
+              tests/scripts/ffmpeg_results.csv
+              tests/scripts/ffmpeg_plugin_performance.log
+
+  windows-mingw-lib-build:
+      needs: changes
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'windows-2022'
+      timeout-minutes: 60
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Disable Windows Defender real-time scanning (speeds up many-small-file MinGW builds)'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
+      - name: 'install msys2 shell'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          update: true
+          cache: true
+          install: git mingw-w64-ucrt-x86_64-gcc cmake mingw-w64-ucrt-x86_64-yasm
+
+      - name: 'Build: SVT-JPEG-XS (MinGW, static, Release) once, reused by all ffmpeg-plugin windows jobs'
+        working-directory: "${{ github.workspace }}"
+        shell: msys2 {0}
+        run: |
+          pacman -S --noconfirm make mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-yasm mingw-w64-x86_64-diffutils mingw-w64-x86_64-winpthreads
+          ./Build/linux/build.sh install --prefix "$(pwd)/install-dir" --no-app --static
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.WINDOWS_LIB_ARTIFACTS }}"
+          retention-days: 1
+          path: |
+            install-dir/
+
+  ffmpeg-6-1-windows-build:
+      needs: [changes, windows-mingw-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'windows-2022'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.WINDOWS_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Disable Windows Defender real-time scanning (speeds up many-small-file MinGW builds)'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
+      - name: 'install msys2 shell'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          update: true
+          cache: true
+          install: git mingw-w64-ucrt-x86_64-gcc cmake mingw-w64-ucrt-x86_64-yasm
+
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        working-directory: "${{ github.workspace }}"
+        shell: msys2 {0}
+        run: |
+           ./.github/scripts/build_ffmpeg_plugin_msys.sh 6.1
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.WINDOWS_ARTIFACTS_6_1 }}"
+          retention-days: 30
+          path: |
+            install-dir/bin/
+
+  ffmpeg-7-0-windows-build:
+      needs: [changes, windows-mingw-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'windows-2022'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.WINDOWS_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Disable Windows Defender real-time scanning (speeds up many-small-file MinGW builds)'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
+      - name: 'install msys2 shell'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          update: true
+          cache: true
+          install: git mingw-w64-ucrt-x86_64-gcc cmake mingw-w64-ucrt-x86_64-yasm
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        working-directory: "${{ github.workspace }}"
+        shell: msys2 {0}
+        run: |
+          ./.github/scripts/build_ffmpeg_plugin_msys.sh 7.0
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.WINDOWS_ARTIFACTS_7_0 }}"
+          retention-days: 30
+          path: |
+            install-dir/bin/
+
+  ffmpeg-7-1-windows-build:
+      needs: [changes, windows-mingw-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'windows-2022'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.WINDOWS_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Disable Windows Defender real-time scanning (speeds up many-small-file MinGW builds)'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
+      - name: 'install msys2 shell'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          update: true
+          cache: true
+          install: git mingw-w64-ucrt-x86_64-gcc cmake mingw-w64-ucrt-x86_64-yasm
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        working-directory: "${{ github.workspace }}"
+        shell: msys2 {0}
+        run: |
+          ./.github/scripts/build_ffmpeg_plugin_msys.sh 7.1
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.WINDOWS_ARTIFACTS_7_1 }}"
+          retention-days: 30
+          path: |
+            install-dir/bin/
+
+  ffmpeg-8-0-windows-build:
+      needs: [changes, windows-mingw-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'windows-2022'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.WINDOWS_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Disable Windows Defender real-time scanning (speeds up many-small-file MinGW builds)'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
+      - name: 'install msys2 shell'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          update: true
+          cache: true
+          install: git mingw-w64-ucrt-x86_64-gcc cmake mingw-w64-ucrt-x86_64-yasm nasm
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        working-directory: "${{ github.workspace }}"
+        shell: msys2 {0}
+        run: |
+          ./.github/scripts/build_ffmpeg_plugin_msys.sh 8.0
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.WINDOWS_ARTIFACTS_8_0 }}"
+          retention-days: 30
+          path: |
+            install-dir/bin/
+
+  ffmpeg-8-1-windows-build:
+      needs: [changes, windows-mingw-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'windows-2022'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.WINDOWS_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Disable Windows Defender real-time scanning (speeds up many-small-file MinGW builds)'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
+      - name: 'install msys2 shell'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          update: true
+          cache: true
+          install: git mingw-w64-ucrt-x86_64-gcc cmake mingw-w64-ucrt-x86_64-yasm nasm
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        working-directory: "${{ github.workspace }}"
+        shell: msys2 {0}
+        run: |
+          ./.github/scripts/build_ffmpeg_plugin_msys.sh 8.1 n
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.WINDOWS_ARTIFACTS_8_1 }}"
+          retention-days: 30
+          path: |
+            install-dir/bin/
+
+  ffmpeg-9-0-windows-build:
+      needs: [changes, windows-mingw-lib-build, ffmpeg-source-fetch]
+      if: ${{ needs.changes.outputs.changed == 'true' }}
+      runs-on: 'windows-2022'
+      timeout-minutes: 120
+      steps:
+      - name: 'Harden Runner'
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout repository'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          allow-unsafe-pr-checkout: true
+
+      - name: 'Setup: Download pre-built svt-jpegxs artifact'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.WINDOWS_LIB_ARTIFACTS }}"
+          path: install-dir
+
+      - name: 'Setup: Disable Windows Defender real-time scanning (speeds up many-small-file MinGW builds)'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
+      - name: 'install msys2 shell'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          update: true
+          cache: true
+          install: git mingw-w64-ucrt-x86_64-gcc cmake mingw-w64-ucrt-x86_64-yasm nasm
+      - name: 'Setup: Download pre-fetched FFmpeg source'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "${{ env.FFMPEG_SRC_ARTIFACT }}"
+          path: ffmpeg-source
+
+      - name: 'install ffmpeg plugin'
+        working-directory: "${{ github.workspace }}"
+        shell: msys2 {0}
+        run: |
+          ./.github/scripts/build_ffmpeg_plugin_msys.sh 9.0 n
+        env:
+          FFMPEG_SRC_DIR: ${{ github.workspace }}/ffmpeg-source
+
+      - name: "Archive: upload artifacts"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "${{ env.WINDOWS_ARTIFACTS_9_0 }}"
+          retention-days: 30
+          path: |
+            install-dir/bin/

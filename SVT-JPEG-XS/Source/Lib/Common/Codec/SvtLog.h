@@ -1,0 +1,72 @@
+/*
+ * Copyright(c) 2019 Intel Corporation
+ *
+ * This source code is subject to the terms of the BSD 2 Clause License and
+ * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
+ * was not distributed with this source code in the LICENSE file, you can
+ * obtain it at https://www.aomedia.org/license/software-license. If the
+ * Alliance for Open Media Patent License 1.0 was not distributed with this
+ * source code in the PATENTS file, you can obtain it at
+ * https://www.aomedia.org/license/patent-license.
+ */
+#ifndef _SVT_LOG_H_
+#define _SVT_LOG_H_
+
+#include "SvtJpegxs.h" // SvtLogLevel, SvtJxsLogCallback
+
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
+#ifndef LOG_TAG
+#define LOG_TAG "Svt"
+#endif
+
+// define this to turn off all library log
+//#define SVT_LOG_QUIET
+#ifndef SVT_LOG_QUIET
+
+// SVT_LOG will not output the prefix. you can control the output style.
+#define SVT_LOG(format, ...) svt_jxs_log(SVT_LOG_ALL, NULL, format, ##__VA_ARGS__)
+
+#define SVT_DEBUG(format, ...) svt_jxs_log(SVT_LOG_DEBUG, LOG_TAG, format, ##__VA_ARGS__)
+#define SVT_INFO(format, ...)  svt_jxs_log(SVT_LOG_INFO, LOG_TAG, format, ##__VA_ARGS__)
+#define SVT_WARN(format, ...)  svt_jxs_log(SVT_LOG_WARN, LOG_TAG, format, ##__VA_ARGS__)
+#define SVT_ERROR(format, ...) svt_jxs_log(SVT_LOG_ERROR, LOG_TAG, format, ##__VA_ARGS__)
+#define SVT_FATAL(format, ...) svt_jxs_log(SVT_LOG_FATAL, LOG_TAG, format, ##__VA_ARGS__)
+
+#else
+
+#define SVT_LOG(format, ...) \
+    do {                     \
+    } while (0)
+#define SVT_DEBUG(format, ...) \
+    do {                       \
+    } while (0)
+#define SVT_INFO(format, ...) \
+    do {                      \
+    } while (0)
+#define SVT_WARN(format, ...) \
+    do {                      \
+    } while (0)
+#define SVT_ERROR(format, ...) \
+    do {                       \
+    } while (0)
+#define SVT_FATAL(format, ...) \
+    do {                       \
+    } while (0)
+
+#endif // SVT_LOG_QUIET
+
+void svt_jxs_log_init();
+void svt_jxs_log(SvtLogLevel level, const char *tag, const char *format, ...);
+
+#ifdef BUILD_TESTING
+void svt_jxs_log_reset_for_testing(void);
+#endif // BUILD_TESTING
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
+
+#endif /*_SVT_LOG_H_*/

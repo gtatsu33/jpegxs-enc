@@ -1,0 +1,177 @@
+name: Fuzzy Tests
+
+on:
+  workflow_run:
+    workflows: ["Base Build"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: false
+        type: string
+        default: 'main'
+      timeout:
+        description: 'test time [seconds] (default: 60)'
+        type: number
+        required: false
+        default: 60
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  JOBS_NUM: 100
+  TIMEOUT_SECONDS: ${{ inputs.timeout || 60 }}
+jobs:
+  build-lib:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+    steps:
+    - name: 'Harden Runner'
+      uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      with:
+        egress-policy: audit
+
+    - name: 'Checkout repository'
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.workflow_run.head_sha || github.sha }}
+        allow-unsafe-pr-checkout: true
+
+    - name: 'Setup:  Install dependencies'
+      run: |
+            sudo apt update
+            sudo apt -y install cmake nasm clang
+
+    - name: Fix workspace permissions
+      if: always()
+      run: |
+        sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" || true
+        chmod -R u+rwX "$GITHUB_WORKSPACE" || true
+
+    - name: 'Setup: Download pre-built svt-jpegxs artifact from Base Build (falls back to local build if missing)'
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      continue-on-error: true
+      with:
+        name: linux-svtjpegxs-install
+        path: install-dir
+        run-id: ${{ github.event.workflow_run.id }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 'Build: SVT-JPEG-XS once, reused by decoder+encoder fuzzer jobs (skipped if reused from Base Build)'
+      working-directory: Build/linux
+      run: |
+        if find "${{ github.workspace }}/install-dir" -name 'SvtJpegxs.pc' 2>/dev/null | grep -q .; then
+          echo "Reusing svt-jpegxs artifact from Base Build workflow run, skipping rebuild."
+        else
+          ./build.sh install --prefix "${{ github.workspace }}/install-dir"
+        fi
+
+    - name: "Archive: upload artifacts"
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: fuzzy-tests-svtjpegxs-lib-${{ github.run_number }}
+        retention-days: 1
+        path: |
+          install-dir/
+
+  decoder:
+    needs: build-lib
+    runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+    steps:
+    - name: 'Harden Runner'
+      uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      with:
+        egress-policy: audit
+
+    - name: 'Checkout repository'
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.workflow_run.head_sha || github.sha }}
+        allow-unsafe-pr-checkout: true
+
+    - name: 'Setup:  Install dependencies'
+      run: |
+            sudo apt update
+            sudo apt -y install cmake nasm clang
+
+    - name: Fix workspace permissions
+      if: always()
+      run: |
+        sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" || true
+        chmod -R u+rwX "$GITHUB_WORKSPACE" || true
+
+    - name: 'Setup: Download pre-built svt-jpegxs artifact'
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: fuzzy-tests-svtjpegxs-lib-${{ github.run_number }}
+        path: install-dir
+
+    - name: 'Setup: Make svt-jpegxs artifact executable'
+      run: sudo chmod -R 755 install-dir/
+
+    - name: 'Build: fuzzer binaries'
+      run: |
+        .github/scripts/fuzzy_tests.sh -b
+      env:
+        SVT_INSTALL_DIR: ${{ github.workspace }}/install-dir
+
+    - name: "Run: Decoder fuzzing tests"
+      run: |
+        .github/scripts/fuzzy_tests.sh -td
+      env:
+        SVT_INSTALL_DIR: ${{ github.workspace }}/install-dir
+        INPUT_FILES_PATH: /opt/samples/Samples/ConformanceTestDecoder/test_bitsreams
+
+  encoder:
+    needs: [build-lib, decoder]
+    runs-on: ['self-hosted', 'linux', 'x64', 'valgrind']
+    steps:
+    - name: 'Harden Runner'
+      uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      with:
+        egress-policy: audit
+
+    - name: 'Checkout repository'
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.workflow_run.head_sha || github.sha }}
+        allow-unsafe-pr-checkout: true
+
+    - name: 'Setup:  Install dependencies'
+      run: |
+            sudo apt update
+            sudo apt -y install cmake nasm clang
+
+    - name: Fix workspace permissions
+      if: always()
+      run: |
+        sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" || true
+        chmod -R u+rwX "$GITHUB_WORKSPACE" || true
+
+    - name: 'Setup: Download pre-built svt-jpegxs artifact'
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: fuzzy-tests-svtjpegxs-lib-${{ github.run_number }}
+        path: install-dir
+
+    - name: 'Setup: Make svt-jpegxs artifact executable'
+      run: sudo chmod -R 755 install-dir/
+
+    - name: 'Build: fuzzer binaries'
+      run: |
+        .github/scripts/fuzzy_tests.sh -b
+      env:
+        SVT_INSTALL_DIR: ${{ github.workspace }}/install-dir
+
+    - name: "Run: Encoder fuzzing tests"
+      run: |
+        .github/scripts/fuzzy_tests.sh -te
+      env:
+        SVT_INSTALL_DIR: ${{ github.workspace }}/install-dir

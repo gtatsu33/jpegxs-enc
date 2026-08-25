@@ -1,0 +1,2 @@
+C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/CMakeFiles/CheckCUDA/CMakeFiles/edit_cache.dir
+C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/CMakeFiles/CheckCUDA/CMakeFiles/rebuild_cache.dir

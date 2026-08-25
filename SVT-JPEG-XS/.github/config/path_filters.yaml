@@ -1,0 +1,43 @@
+# This is used by the action https://github.com/dorny/paths-filter
+base_build: &base_build
+  - 'Source/**'
+  - 'tests/**'
+  - 'third_party/**'
+  - 'Build/**'
+  - 'CMakeLists.txt'
+  - .github/config/path_filters.yaml
+  - .github/workflows/base_build.yaml
+
+ffmpeg_plugin_build: &ffmpeg_plugin_build
+  - 'ffmpeg-plugin/**'
+  - '.github/scripts/build_ffmpeg_plugin.sh'
+  - '.github/scripts/build_ffmpeg_plugin_msys.sh'
+  - 'Source/API/**'
+  - 'Source/Lib/**'
+  - 'third_party/**'
+  - 'Build/**'
+  - 'CMakeLists.txt'
+  - 'tests/scripts/FFmpeg*.sh'
+  - .github/config/path_filters.yaml
+  - .github/workflows/ffmpeg_plugin_build.yaml
+
+gstreamer_plugin_build: &gstreamer_plugin_build
+  - '.github/scripts/build_gstreamer_plugin.sh'
+  - 'tests/scripts/Gstreamer*.sh'
+  - 'tests/scripts/ParallelAllGstreamerTests.sh'
+  - 'Source/API/**'
+  - 'Source/Lib/**'
+  - 'third_party/**'
+  - 'Build/**'
+  - 'CMakeLists.txt'
+  - .github/config/path_filters.yaml
+  - .github/workflows/gstreamer_plugin_build.yaml
+
+oomify_tests: &oomify_tests
+  - 'Source/**'
+  - 'tests/scripts/OomifyTest.sh'
+  - 'third_party/**'
+  - 'Build/**'
+  - 'CMakeLists.txt'
+  - .github/config/path_filters.yaml
+  - .github/workflows/oomify_tests.yaml

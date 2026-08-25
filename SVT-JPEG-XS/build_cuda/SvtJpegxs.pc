@@ -1,0 +1,16 @@
+# Relocatable install: prefix is derived from this file's own location via
+# ${pcfiledir}, which requires pkg-config >= 0.27 (2012) or any pkgconf
+# version. Older pkg-config leaves ${pcfiledir} undefined/empty, breaking
+# the paths below.
+prefix=${pcfiledir}/../../
+exec_prefix=${prefix}
+includedir=${prefix}/include
+libdir=${exec_prefix}/lib
+
+Name: SvtJpegxs
+Description: SVT (Scalable Video Technology) for JPEG XS library
+Version: 0.10.0
+Libs: -L${libdir} -lSvtJpegxs
+Libs.private: 
+Cflags: -I${includedir}/svt-jpegxs  -DDEF_DLL
+Cflags.private: -UDEF_DLL

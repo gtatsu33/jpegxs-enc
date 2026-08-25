@@ -1,0 +1,355 @@
+#!/bin/bash
+#
+# Copyright(c) 2025 Intel Corporation
+# SPDX - License - Identifier: BSD - 2 - Clause - Patent
+#
+#param 'help' print script params
+
+
+echo "Run Decoder Multiple Frames Test"
+source ./CommonLib.sh
+path_correct="$path_global/bitstream_multi_frames"
+path_invalid="$path_global/bitstream_invalid"
+path_encoder_tests="$path_global/encoder_tests"
+#Encoder binary next to $exec_dec, used to generate temp MSB-aligned bitstreams from real sample YUV
+exec_enc="${exec_dec//SvtJpegxsDecApp/SvtJpegxsEncApp}"
+
+echo "DECODER : $exec_dec"
+echo "ENCODER : $exec_enc"
+echo "Path correct: $path_correct"
+echo "Path change: $path_change"
+
+cmd="$exec_dec"
+#${cmd}
+
+error=0
+PARAM_LP_NUM=-1
+PARAM_ASM="max"
+PARAM_PACKETIZATION="0"
+
+
+function end {
+    rm -fr $tmp_dir
+    if ((!($range_min == 0 && $range_min == $range_max))); then
+        echo Exit $0 script with exit $error
+        exit $error
+    fi
+}
+
+function test_dec {
+    exit_code=$1
+    name=$2
+    md5=$3
+    params=$4
+    bin_name=$path_use"/"$name".jxs"
+    yuv_name=$path_use"/dec_yuv/"$name".yuv"
+    yuv_tmp="./$tmp_dir/"$name".yuv"
+
+    common_lib_update_test_id_run_return_1_to_ignore
+    ignore=$?
+     if [ $ignore -ne 0 ]; then
+        return
+    fi
+
+    cmd="$valgrind$exec_dec -i $bin_name -o $yuv_tmp --lp $PARAM_LP_NUM --asm ${SANITIZER_ASM:-$PARAM_ASM} --packetization-mode $PARAM_PACKETIZATION "$params
+    echo "run command: $cmd"
+    run_cmd "$cmd"
+
+    ret=$?
+    if [ $ret -ne $exit_code ]; then
+        echo "FAIL Invalid error code: $ret expected: $exit_code"
+        error=1
+        end
+    fi
+
+    if [ -z "$md5" ]; then
+        echo -n "Test diff: "
+        cmd_cmp="diff $yuv_name $yuv_tmp"
+        ${cmd_cmp} >  /dev/null
+        ret=$?
+        if [ $ret -ne 0 ]; then
+           echo "FAIL comapare: $cmd_cmp"
+           error=1
+           end
+        else
+            echo "OK"
+        fi
+    else
+        echo -n "Test MD5 Expect: $md5 "
+        md5_t=`md5sum ${yuv_tmp} | awk '{ print $1 }'`
+        if [ $md5 = $md5_t ]; then
+            echo "OK"
+        else
+            echo "FAIL get $md5_t"
+            error=1
+            end
+        fi
+    fi
+}
+
+
+rm -fr $tmp_dir
+mkdir $tmp_dir
+
+#Prepare a temp bitstream from real sample YUV using EncApp, to test decoder output_bit_depth_msb_aligned
+#without needing a pre-baked fixture file. Decoded twice below (msb-aligned 0 and 1) from this single bitstream.
+bitstream_msb_prep="$tmp_dir/msb_prep.jxs"
+cmd_prep="$exec_enc -i $path_encoder_tests/touchdown_1080p_yuv422p_10_bit_le_60_frames.yuv -w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5 --asm max --lp 7 --profile latency --packetization-mode 0 -b $bitstream_msb_prep"
+echo "run command: $cmd_prep"
+run_cmd "$cmd_prep"
+
+#No real 4-component (alpha) sample YUV exists in $path_encoder_tests. Synthesize multi-frame yuva422
+#and rgba/yuva444 raw files on the fly (same technique as EncoderTest.sh/DecoderConformanceTest.sh) from
+#the real touchdown 8bit 422 sample, then encode+prep a multi-frame bitstream for each new format.
+yuva422_w=1920
+yuva422_h=1080
+yuva422_frames=5
+yuva422_y_size=$((yuva422_w * yuva422_h))
+yuva422_c_size=$((yuva422_w * yuva422_h / 2))
+yuva422_frame_size=$((yuva422_y_size + 2 * yuva422_c_size))
+yuva422_src="$path_encoder_tests/touchdown_1080p_yuv422p_8_bit_60_frames.yuv"
+yuva422_synth="$tmp_dir/synth_yuva422.yuv"
+rm -f "$yuva422_synth"
+for ((yuva422_f = 0; yuva422_f < yuva422_frames; yuva422_f++)); do
+    yuva422_off=$((yuva422_f * yuva422_frame_size))
+    tail -c +$((yuva422_off + 1)) "$yuva422_src" | head -c $yuva422_frame_size >> "$yuva422_synth"
+    tail -c +$((yuva422_off + 1)) "$yuva422_src" | head -c $yuva422_y_size >> "$yuva422_synth"
+done
+bitstream_yuva422_prep="$tmp_dir/yuva422_prep.jxs"
+cmd_prep_alpha="$exec_enc -i $yuva422_synth -w $yuva422_w -h $yuva422_h --input-depth 8 --colour-format yuva422 --bpp 24 --quantization 0 -n $yuva422_frames -b $bitstream_yuva422_prep --asm max"
+echo "run command: $cmd_prep_alpha"
+run_cmd "$cmd_prep_alpha"
+
+yuva444_w=1920
+yuva444_h=1080
+yuva444_frames=5
+yuva444_plane_size=$((yuva444_w * yuva444_h))
+yuva444_src="$path_encoder_tests/touchdown_1080p_yuv422p_8_bit_60_frames.yuv"
+yuva444_synth="$tmp_dir/synth_yuva444.yuv"
+rm -f "$yuva444_synth"
+for ((yuva444_f = 0; yuva444_f < yuva444_frames; yuva444_f++)); do
+    yuva444_off=$((yuva444_f * yuva422_frame_size))
+    for ((yuva444_p = 0; yuva444_p < 4; yuva444_p++)); do
+        tail -c +$((yuva444_off + 1)) "$yuva444_src" | head -c $yuva444_plane_size >> "$yuva444_synth"
+    done
+done
+bitstream_yuva444_prep="$tmp_dir/yuva444_prep.jxs"
+cmd_prep_444="$exec_enc -i $yuva444_synth -w $yuva444_w -h $yuva444_h --input-depth 8 --colour-format rgba --bpp 32 --quantization 0 -n $yuva444_frames -b $bitstream_yuva444_prep --asm max"
+echo "run command: $cmd_prep_444"
+run_cmd "$cmd_prep_444"
+
+#Compares two same-size files sample-by-sample and fails if any absolute difference exceeds $3.
+#(1:file A) (2:file B) (3:max allowed absolute per-byte difference)
+function compare_yuv_tolerance {
+    file_a=$1
+    file_b=$2
+    max_allowed=$3
+
+    max_diff=`cmp -l "$file_a" "$file_b" | awk '{v1=strtonum("0"$2); v2=strtonum("0"$3); d=(v1>v2)?v1-v2:v2-v1; if(d>max)max=d} END{print max+0}'`
+    echo -n "Max abs diff vs original input: $max_diff (allowed <= $max_allowed) "
+    if [ "$max_diff" -gt "$max_allowed" ]; then
+        echo "FAIL"
+        error=1
+        end
+    else
+        echo "OK"
+    fi
+}
+
+#RUN yuva422/yuva444 multi-frame decode round-trip: decode the self-generated bitstream and compare
+#against the original synthesized input directly (not just a pinned md5). Parameters (1:asm) (2:lp) (3:packetization-mode)
+function test_four_component_alpha_decode {
+    PARAM_ASM=$1
+    PARAM_LP_NUM=$2
+    PARAM_PACKETIZATION=$3
+
+    common_lib_update_test_id_run_return_1_to_ignore
+    ignore=$?
+    if [ $ignore -ne 0 ]; then
+        return
+    fi
+
+    out_yuv="$tmp_dir/yuva422_prep_out.yuv"
+    cmd="$valgrind$exec_dec -i $bitstream_yuva422_prep -o $out_yuv --lp $PARAM_LP_NUM --asm $PARAM_ASM --packetization-mode $PARAM_PACKETIZATION"
+    echo "run command: $cmd"
+    run_cmd "$cmd"
+    ret=$?
+    if [ $ret -ne 0 ]; then
+        echo "FAIL Can not decode bitstream, error code: $ret"
+        error=1
+        end
+    fi
+    compare_yuv_tolerance "$yuva422_synth" "$out_yuv" 4
+}
+
+function test_four_component_444_decode {
+    PARAM_ASM=$1
+    PARAM_LP_NUM=$2
+    PARAM_PACKETIZATION=$3
+
+    common_lib_update_test_id_run_return_1_to_ignore
+    ignore=$?
+    if [ $ignore -ne 0 ]; then
+        return
+    fi
+
+    out_yuv="$tmp_dir/yuva444_prep_out.yuv"
+    cmd="$valgrind$exec_dec -i $bitstream_yuva444_prep -o $out_yuv --lp $PARAM_LP_NUM --asm $PARAM_ASM --packetization-mode $PARAM_PACKETIZATION"
+    echo "run command: $cmd"
+    run_cmd "$cmd"
+    ret=$?
+    if [ $ret -ne 0 ]; then
+        echo "FAIL Can not decode bitstream, error code: $ret"
+        error=1
+        end
+    fi
+    compare_yuv_tolerance "$yuva444_synth" "$out_yuv" 4
+}
+
+
+function test_all_correct {
+    PARAM_ASM=$1
+    PARAM_LP_NUM=$2
+    PARAM_PACKETIZATION=$3
+
+    path_use=$path_correct
+    #Test R2R Decoder with MT per Slice small resolution
+    test_dec 0 dec_r2r_mt-01                                          b00732fc18e6ca1ec02c9a4fb990a1ba
+    test_dec 0 dec_r2r_mt-02                                          77ae505214f976fe30b55d1ac3594084
+    test_dec 0 dec_r2r_mt-03                                          67f1ca191402372a227a5af65e47ed86
+    test_dec 0 one_slice_1080                                         5cd468fb69609a8d6fbcecd2a9d3e57b
+
+    #Test Coefficients minus-zero and plus-zero coding
+    test_dec 0 test-zero-sign-1-minus-zero                            6ba9ba462d53490717983c171ef50e59
+    test_dec 0 test-zero-sign-1-plus-zero                             6ba9ba462d53490717983c171ef50e59
+    test_dec 0 test-zero-sign-2-minus-zero                            c57ad54b3a32a83b55a1cda3314c5a29
+    test_dec 0 test-zero-sign-2-plus-zero                             c57ad54b3a32a83b55a1cda3314c5a29
+    test_dec 0 test-zero-sign-3-minus-zer                             ad74cde2fc470f2c89b9060e7290f339
+    test_dec 0 test-zero-sign-3-plus-zero                             ad74cde2fc470f2c89b9060e7290f339
+    test_dec 0 test-zero-sign-4-minus-zero                            fde93442420ef3048a3481bf1449ba59
+    test_dec 0 test-zero-sign-4-plus-zero                             fde93442420ef3048a3481bf1449ba59
+
+    #Test Correct bitstreams
+    #test  |  Expect error code | dir to file | file name            | MD5 sum if empty look compare file in dir dec_yuv
+    test_dec 0 Cyclist_1920x1080_10b_422_20f_v1_h5                    f65f42c074fa6fbdc3e9136ec86b9828
+    test_dec 0 Cyclist_1920x1080_10b_422_20f_v2_h3                    39983e5e039da3917e5f7bf7ef9a87bf
+    test_dec 0 Cyclist_1920x1080_8b_422_20f_v1_h4                     281a046a4d0c9bcb554e828d2a8084ef
+    test_dec 0 Cyclist_1920x1080_8b_422_20f_v2_h2                     e71c8400a4f3a636408b48450bae92d3
+    test_dec 0 Daylight_1280x720_10b_422_20f_v1_h1                    db9a6c952daf5e9c7b108e61b6d0e056
+    test_dec 0 Daylight_1280x720_10b_422_20f_v2_h5                    b543cacde0d9a3fdeb6a123875f2868d
+    test_dec 0 Daylight_1280x720_8b_422_20f_v1_h1                     d0c8097ead80367ffb50c33553b51795
+    test_dec 0 Daylight_1280x720_8b_422_20f_v1_h5                     f9b705a3ac20daeea8ce21af5f0bf908
+    test_dec 0 RollerCoaster_3840x2160_10b_422_20f_v1_h4              e3e91a199bbd8096a8cfd2c0109829ff
+    test_dec 0 RollerCoaster_3840x2160_10b_422_20f_v1_h5              01f13f55acf98b8b5fb19cfd3c6a54c1
+    test_dec 0 RollerCoaster_3840x2160_8b_422_20f_v2_h2               550612cfe8797ea51fbc257158f319a3
+    test_dec 0 RollerCoaster_3840x2160_8b_422_20f_v2_h3               2f9090271c68800014e15b88d08103aa
+}
+
+function test_all_broken {
+    PARAM_ASM=$1
+    PARAM_LP_NUM=$2
+    PARAM_PACKETIZATION="0"
+
+    # broken_* fixtures live alongside the correct ones; set explicitly so this
+    # function is order-independent (in 'fast' mode test_all_correct is skipped).
+    path_use=$path_correct
+
+    # TEST WITH IGNORE SOME FRAMES
+    #a. broken_decomh_Daylight_1280x720_8b_422_20fx1fx20f.jxs
+    #1. 20frames 8bit yuv422 1280x720 v1 h5
+    #2. 1frame   8bit yuv422 1280x720 v1 h3
+    #3. 20frames 8bit yuv422 1280x720 v1 h5
+    test_dec 1 broken_decomh_Daylight_1280x720_8b_422_20fx1fx20f       560d305916e20f010098bc31ece5d5b6
+
+    #b.broken_bit_depth_Daylight_1280x720_8b_422_20fx1fx20f.jxs
+    #1. 20frames 8bit  yuv422 1280x720 v1 h5
+    #2. 1frames  10bit yuv422 1280x720 v1 h5
+    #3. 20frames 8bit  yuv422 1280x720 v1 h5
+    test_dec 1 broken_bit_depth_Daylight_1280x720_8b_422_20fx1fx20f    560d305916e20f010098bc31ece5d5b6
+
+    #c. broken_resolution_Daylight_1280x720_8b_422_20fx1fx20f.jxs
+    #1. 20frames 8bit yuv422 1280x720  v1 h5
+    #2. 1frames  8bit yuv422 1920x1080 v1 h5
+    #3. 20frames 8bit yuv422 1280x720  v1 h5
+    test_dec 1 broken_resolution_Daylight_1280x720_8b_422_20fx1fx20f   560d305916e20f010098bc31ece5d5b6
+
+    #d. broken_bitstream_Daylight_1280x720_8b_422_20fx1fx20f.jxs
+    #1. 20frames 8bit yuv422 1280x720 v1 h5
+    #2. 1frame   8bit yuv422 1280x720 v1 h5 BROKEN BITSTREAM (wrong D[p,b] Bitplane count coding mode of band b)
+    #3. 20frames 8bit yuv422 1280x720 v1 h5
+    test_dec 1 broken_bitstream_Daylight_1280x720_8b_422_20fx1fx20f    560d305916e20f010098bc31ece5d5b6
+
+    #e. broken_weight_table_Daylight_1280x720_8b_422_20fx1fx20f.jxs
+    #1. 20frames 8bit yuv422 1280x720 v1 h5 REF weight_table
+    #2. 1frames   8bit yuv422 1280x720 v1 h5 MOD weight_table
+    #3. 20frames 8bit yuv422 1280x720 v1 h5 REF weight_table
+    test_dec 1 broken_weight_table_Daylight_1280x720_8b_422_20fx1fx20f 560d305916e20f010098bc31ece5d5b6
+
+
+    #Test hang decoder tests (when try decode bitstream from begin)
+    test_dec 0 test_422_32x32_bpp6                                     5fe89b9423b6c38a6a91c1ce81f90259 "-n 2"
+
+    #Change PATH to bitstreams with error injection
+    path_use=$path_invalid
+
+    #Test invalid bitstreams
+    test_dec 1 error_injection_422_broken_bitstream                    d41d8cd98f00b204e9800998ecf8427e
+    test_dec 2 invalid_small_cfg_zero_band_01                          d41d8cd98f00b204e9800998ecf8427e
+    test_dec 2 invalid_small_cfg_zero_band_02                          d41d8cd98f00b204e9800998ecf8427e
+    test_dec 2 invalid_small_cfg_zero_band_03                          d41d8cd98f00b204e9800998ecf8427e
+    test_dec 2 invalid_small_cfg_zero_band_04                          d41d8cd98f00b204e9800998ecf8427e
+    test_dec 2 invalid_small_cfg_zero_band_05                          d41d8cd98f00b204e9800998ecf8427e
+    test_dec 2 invalid_small_cfg_zero_band_06                          d41d8cd98f00b204e9800998ecf8427e
+    test_dec 2 invalid_small_cfg_zero_band_07                          d41d8cd98f00b204e9800998ecf8427e
+    test_dec 2 invalid_small_cfg_zero_band_08                          d41d8cd98f00b204e9800998ecf8427e
+    test_dec 2 invalid_small_cfg_zero_band_09                          d41d8cd98f00b204e9800998ecf8427e
+    test_dec 2 invalid_small_cfg_zero_band_10                          d41d8cd98f00b204e9800998ecf8427e
+}
+
+#RUN output_bit_depth_msb_aligned tests: decode the same self-generated bitstream twice (msb-aligned 0 and 1)
+#Parameters (1:asm) (2:lp number) (3:packetization mode)
+function test_msb_aligned_output {
+    PARAM_ASM=$1
+    PARAM_LP_NUM=$2
+    PARAM_PACKETIZATION=$3
+
+    path_use=$tmp_dir
+    #Default (LSB) and MSB-aligned outputs of the SAME bitstream, pinned md5 (verified: msb == lsb << (16-depth))
+    test_dec 0 msb_prep f48a73066e7a78d0207d3419b37097f4 "--output-msb-aligned 0"
+    test_dec 0 msb_prep 984080ab17c11c747da832b3b7be6eab "--output-msb-aligned 1"
+
+    #Reject any value other than 0/1
+    test_dec 2 msb_prep d41d8cd98f00b204e9800998ecf8427e "--output-msb-aligned 2"
+    test_dec 2 msb_prep d41d8cd98f00b204e9800998ecf8427e "--output-msb-aligned 255"
+}
+
+[[ $run_fast -eq 0 ]] && test_all_correct c 10 0
+                         test_all_broken c 10
+                         test_all_correct avx2 20 0
+                         test_all_broken avx2 20
+                         test_all_correct avx2 20 1
+[[ $run_fast -eq 0 ]] && test_all_correct max 1 0
+                         test_all_broken max 1
+                         test_all_correct max 1 1
+
+echo Test output_bit_depth_msb_aligned
+[[ $run_fast -eq 0 ]] && test_msb_aligned_output c 10 0
+                         test_msb_aligned_output avx2 20 0
+                         test_msb_aligned_output max 1 1
+
+echo "Test yuva422 (4:2:2:4) multi-frame decode round-trip"
+[[ $run_fast -eq 0 ]] && test_four_component_alpha_decode c 10 0
+                         test_four_component_alpha_decode avx2 20 0
+                         test_four_component_alpha_decode max 1 1
+
+echo "Test rgba/yuva444 (4:4:4:4) multi-frame decode round-trip"
+[[ $run_fast -eq 0 ]] && test_four_component_444_decode c 10 0
+                         test_four_component_444_decode avx2 20 0
+                         test_four_component_444_decode max 1 1
+
+
+common_lib_end_summary
+
+echo "DONE Multiple Frames OK"
+error=0
+end

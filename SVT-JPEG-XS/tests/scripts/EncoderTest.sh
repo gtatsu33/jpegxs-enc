@@ -1,0 +1,1092 @@
+#!/bin/bash
+#
+# Copyright(c) 2025 Intel Corporation
+# SPDX - License - Identifier: BSD - 2 - Clause - Patent
+#
+#param 'help' print script params
+
+
+echo "Run Encoder Conformance Test"
+source ./CommonLib.sh
+
+path_correct="$path_global/encoder_tests"
+exec_enc_rel="${exec_dec//SvtJpegxsDecApp/SvtJpegxsEncApp}"
+#current CI not support delivery Debug
+exec_enc_dbg="${exec_enc_rel//RelWithDebInfo/Debug}"
+exec_enc_dbg="${exec_enc_dbg//Release/Debug}"
+
+echo "Run Encoder Test"
+echo "Decode:          $decode_flag"
+echo "Path correct:    $path_correct"
+echo "Decoder:         $exec_dec"
+echo "Encoder Release: $exec_enc_rel"
+echo "Encoder Debug:   $exec_enc_dbg"
+
+error=0
+
+function end {
+#   CI output not required
+    if [ $decode_flag -eq 0 ]; then
+       rm -fr $tmp_dir
+    fi
+
+    if ((!($range_min == 0 && $range_min == $range_max))); then
+        #No exit when use source to get variable
+        echo Exit $0 script with exit $error
+        exit $error
+    fi
+}
+
+# (1:expected error code) (2:md5 or test.jxs file if '.' in name) (3:name input yuv) (4: "all other parameters to encoder")
+function test_enc {
+    exit_code=$1
+    name_yuv=$3
+    path_yuv=$path_correct"/"$name_yuv".yuv"
+    encoder_parameters=$4
+
+    common_lib_update_test_id_run_return_1_to_ignore
+    ignore=$?
+     if [ $ignore -ne 0 ]; then
+        return
+    fi
+
+    name_postfix=$encoder_parameters
+#    Rename and space and - in filename to _ and remove double __
+    name_postfix="${name_postfix// /_}"
+    name_postfix="${name_postfix//-/_}"
+    name_postfix="${name_postfix//__/_}"
+    name_postfix="${name_postfix//__/_}"
+    name_postfix="${name_postfix//__/_}"
+    name_postfix="${name_postfix//__/_}"
+    name_postfix="${name_postfix//__/_}"
+
+
+    if [[ "$2" == *"."* ]]; then
+        yuv_compare_name=$path_correct"/enc_bin/"$2$name_postfix
+    else
+        md5=$2
+    fi
+
+    bin_name=$test_id_print"_"$name_yuv"_"$name_postfix
+#   Reduce file name to 100 chars, too long filename can not be opened.
+    bin_name="${bin_name:0:100}"
+    bin_path="$tmp_dir/"$bin_name".jxs"
+    out_yuv_path="$tmp_dir/"$bin_name".yuv"
+
+#   Encode and check expected error code
+    cmd="$valgrind$exec_enc -i $path_yuv -b $bin_path $encoder_parameters"
+    echo "run command: $cmd"
+    run_cmd "$cmd"
+
+    ret=$?
+    if [ $ret -ne $exit_code ]; then
+        echo "FAIL Invalid error code: $ret expected: $exit_code"
+        error=1
+        end
+    fi
+
+    if [ $decode_flag -ne 0 ]; then
+#       Check that stream is possible to decode
+        if [ $ret -eq 0 ]; then
+            cmd="$exec_dec -i $bin_path"
+#           CI not required output YUV
+            cmd="$cmd -o $out_yuv_path"
+            echo "run command: $cmd"
+            run_cmd "$cmd"
+            ret=$?
+            if [ $ret -ne 0 ]; then
+                echo "FAIL Can not decode bitstream, error code: $ret"
+                error=1
+                end
+            fi
+#
+#            TODO: A place to compare the source YUV and the decoded YUV and see if the quality doesn't drop too much
+#
+        fi
+    fi
+
+#   Check bitstream are as expected
+    if [ -z "$md5" ]; then
+        echo -n "Test diff: "
+        cmd_cmp="diff $yuv_compare_name $yuv_tmp"
+        ${cmd_cmp} >  /dev/null
+        ret=$?
+        if [ $ret -ne 0 ]; then
+           echo "FAIL comapare: $cmd_cmp"
+           error=1
+           end
+        else
+            echo "OK"
+        fi
+    elif [ $md5 = "IGNORE" ]; then
+        echo "IGNORE TEST OUTPUT"
+    else
+        echo -n "Test MD5 Expect: $md5 "
+        md5_t=`md5sum ${bin_path} | awk '{ print $1 }'`
+        if [ $md5 = $md5_t ]; then
+            echo "OK"
+        else
+            echo "FAIL get $md5_t"
+#           Comment below 2 lines to generate md5 differences
+            error=1
+            end
+        fi
+    fi
+}
+
+
+rm -fr $tmp_dir
+mkdir $tmp_dir
+
+#No real 4-component (alpha) sample YUV exists in $path_correct. Synthesize one on the fly (like the
+#MSB-aligned test synthesizes a temp bitstream) from the real touchdown 8bit 422 sample: keep its
+#real Y/Cb/Cr planes as-is and append a duplicate of the Y plane as a synthetic full-resolution alpha
+#plane, giving a valid yuva422 (4:2:2:4) raw layout without adding any new external fixture file.
+yuva422_w=1920
+yuva422_h=1080
+yuva422_frames=3
+yuva422_y_size=$((yuva422_w * yuva422_h))
+yuva422_c_size=$((yuva422_w * yuva422_h / 2))
+yuva422_frame_size=$((yuva422_y_size + 2 * yuva422_c_size))
+yuva422_src="$path_correct/touchdown_1080p_yuv422p_8_bit_60_frames.yuv"
+yuva422_synth="$tmp_dir/synth_touchdown_1080p_yuva422p_8_bit_3_frames.yuv"
+rm -f "$yuva422_synth"
+for ((yuva422_f = 0; yuva422_f < yuva422_frames; yuva422_f++)); do
+    yuva422_off=$((yuva422_f * yuva422_frame_size))
+    tail -c +$((yuva422_off + 1)) "$yuva422_src" | head -c $yuva422_frame_size >> "$yuva422_synth"
+    tail -c +$((yuva422_off + 1)) "$yuva422_src" | head -c $yuva422_y_size >> "$yuva422_synth"
+done
+
+#No real 4:4:4:4 (rgba/yuva444) sample YUV exists in $path_correct either. Synthesize one the same
+#way: take the real Y (luma) plane of each frame and use 4 copies of it as the 4 full-resolution
+#planes (4:4:4:4 has no chroma subsampling, so all 4 planes are simply w*h bytes each).
+yuva444_w=1920
+yuva444_h=1080
+yuva444_frames=3
+yuva444_plane_size=$((yuva444_w * yuva444_h))
+yuva444_src="$path_correct/touchdown_1080p_yuv422p_8_bit_60_frames.yuv"
+yuva444_synth="$tmp_dir/synth_touchdown_1080p_yuva444p_8_bit_3_frames.yuv"
+rm -f "$yuva444_synth"
+for ((yuva444_f = 0; yuva444_f < yuva444_frames; yuva444_f++)); do
+    yuva444_off=$((yuva444_f * yuva422_frame_size))
+    for ((yuva444_p = 0; yuva444_p < 4; yuva444_p++)); do
+        tail -c +$((yuva444_off + 1)) "$yuva444_src" | head -c $yuva444_plane_size >> "$yuva444_synth"
+    done
+done
+
+#Pre-existing "Experimental" formats (yuv444/rgb planar, rgbp packed) also have zero script coverage.
+#Reuse the same real Y plane (3 copies instead of 4 - no alpha) for the planar 3-component case; the
+#packed case only differs in how EncApp structures its in-memory buffer (one interleaved buffer vs 3
+#separate arrays), not in total per-frame byte count, so the identical flat byte layout works as input
+#for both - content correctness isn't the point here, exercising the code path deterministically is.
+rgb_w=1920
+rgb_h=1080
+rgb_frames=3
+rgb_plane_size=$((rgb_w * rgb_h))
+rgb_src="$path_correct/touchdown_1080p_yuv422p_8_bit_60_frames.yuv"
+rgb_synth="$tmp_dir/synth_touchdown_1080p_rgb_8bit_3_frames.yuv"
+rm -f "$rgb_synth"
+for ((rgb_f = 0; rgb_f < rgb_frames; rgb_f++)); do
+    rgb_off=$((rgb_f * yuva422_frame_size))
+    for ((rgb_p = 0; rgb_p < 3; rgb_p++)); do
+        tail -c +$((rgb_off + 1)) "$rgb_src" | head -c $rgb_plane_size >> "$rgb_synth"
+    done
+done
+
+#RUN different RC parameters Release/Debug/ ASM_C/ASM_MAX compare Parameters (1:asm) (2:lp number)
+function test_rate_control {
+    asm=${SANITIZER_ASM:-$1}
+    lp=$2
+    cpu_profile=$3
+    packetization_mode=$4
+
+#Variable RC
+    test_enc 0 dec10fc5e717b1f638fb5eda84156d0d touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --coding-signs 2 --rc 0  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3f24dcf3bdfd1184caacac7fa9989a78 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --coding-signs 2 --rc 1  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 588b4620f590983173dc4d2b1de28a66 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --coding-signs 2 --rc 2  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 588b4620f590983173dc4d2b1de28a66 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --coding-signs 2 --rc 3  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d5646d86e31816150472519976661acc touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --coding-signs 0 --rc 0  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 820a3890a0b7748802672f37e0f90565 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --coding-signs 0 --rc 1  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d919643df86a9da2808dc8108ea5e939 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --coding-signs 0 --rc 2  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d919643df86a9da2808dc8108ea5e939 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --coding-signs 0 --rc 3  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+#Variable RC error path
+    test_enc 11 IGNORE                          touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 0.1 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --coding-signs 2 --rc 0  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 11 IGNORE                          touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 0.1 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --coding-signs 2 --rc 1  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 11 IGNORE                          touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 0.1 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --coding-signs 2 --rc 2  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 11 IGNORE                          touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 0.1 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --coding-signs 2 --rc 3  -n 10 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   8bit tests RC
+    test_enc 0 41604bc3d488874c1e5a9e20e83d2825 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e48dcb6b3aae46f0cde1083598f3ac77 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 0 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e65e13545fba3dfd64deb040b175ae58 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c57e74bbe0d59123e66d12a4b9a9d0fb touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 95090050cdb066551fc487510bd9ae4d touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 5 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 72bbde59186789d8d207cce990564247 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4f6c0f262c713da24eafa0fa21de31f6 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f1dbde43258209cfb954a4daadf7af00 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+#   10bit multiple frames
+    test_enc 0 62764838a69b79251eae1a63d97402e4 touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1645f35b06b142b7aba2312d7e2682b9 touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+#   10bit signal tests RC
+    test_enc 0 60a2528650c59c70da44a983ee5453f8 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 74547e6287265adb9b26a462ff6f55a3 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 0 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 11929b0366e220fa9eee7f4b351c8049 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 0 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+#   10bit signal tests RC multiple V H
+    test_enc 0 87b648ce013bec8e2c3bda55a9be5b5e signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 424265e83e9503ca51da678868637080 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 285172dfeccacbc8f2f79facbcf25c26 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 dd03295714ca3beaa78dccb97df31857 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 366a593b10c2867d0380ec40b653df66 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 58add7441d3e48ec858c534349bb129e signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 56adcc857c7d51e1201560ed31c741d9 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3451721f7a5ba9df11800ea00b27bc22 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 71daecdf8cb1778a219cb1ec07931194 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6f8771ad30d038a25c886c1fd4ed17d4 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 b0cb8a5ee258c14130b705aeb5a5262e signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 746d7fa4a127b5b46bd9645d33e2ba69 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e5e40db71571dd39d2347b894f9e0e19 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4e18952dacb21d888678b2fd4d1cf342 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   YUV420 RC 420 not support V:0
+    test_enc 0 0d96f3d36bf0b3117821e880e5146853 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d666d74d2bf469b50af0b0cb4d9d4a83 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 0 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 89fdfeeb921860e4b6223f817edffb0c touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 ac8859d2a2f08e1dc070c651767a3d2c touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 394e175dea751b6a06242186487c8b97 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 24faf7d526609ebd299f138d11f391da touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 68d1abcde55e9ef14e707f2b71f37404 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 eb3352bb9d1b2f056e078bce302f82ab touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c80ecca80b41dd4da7d0c5dfff190402 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 b237647a542ae1ab49dd5fc93e42dad8 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 75c4c99892415523c3f70a2d81e5003b touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 326624c8db017ba7d993369f69f6ac18 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 0 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 852cd5a2e0b8c34165345764e036e6eb touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2ba5980657ebf8b1dcc1a10c1a6ae64c touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 053492f767f46107c8b13f6f905ebad0 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 71a058af2a75710290ab539365e89dce touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2ea4976858091ca4761cb796d8e0fe1e touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8d0b946a16e0c9037b1ed8d4e9e23b38 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1fe00e7d304e58ed432e98ccf95137cf touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c14184d843dc8d541b8599232268748f touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   Vertical Prediction significance all modes
+    test_enc 0 561a821f77e0539aa7ed2d42abdeafda touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 0 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 ca680b1b088d5fc0836ac1290102dd2b touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 70b44d6ed1814f86c459ccb781cb2a03 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 21511eb8c93743eb32488a57d21c536f touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 5 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 45c7119242338c520cd9a691b0f6a807 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f203f6c4804d4c6135f52d365d5c5ef4 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 04786ebf5bb13a56d9803b894d5d45d1 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 1 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 a21ceb97ca678157c2a8d6cbf9bb728c touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 0 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 244c0e6da1df3706c497088f8bb3f95b touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 94125d844d2fdfed07c2038c42123151 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6066f9c81b3ddbe228b4409653981ef8 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 5 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 aa884c92ab5c7b83eb944f2fbe4c1d77 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 990adbb4986aadddfcbdb451ba12cd2a touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2f9a769358c90b211027024237e257f2 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 1 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 af89ecf5044cc328e8ca9c8b06e3cc87 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 0 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3cf40d5a340af5624477252185a87e4a touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8d8eca4fd786fc7661216c6f63ca632e touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 3 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 85f4535e9a545a95ebfe9d93a3e839d3 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4fbbfc3ef46bf961731d847b6e1f6e2c touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 aa7b6c29920185d33ef26bdf43e2a240 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4cff64a41d670198252710cc75ba6e0f touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a87c09057f3cd31499c694beacfa7f33 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d9fd01fa058d3b7d46f3630e1b3e1e2b touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 41889b68a29b28767a306d4b5cb5c493 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 0 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 608378663f4e27007d1cd346bb8ff45a touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 005dad881fea8ff13a13a41d1c5f078c touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 3 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2b6af54596e0cbe0345441cf679f9ed7 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 066e02dc99dc50f98118040a07c4b729 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 5f7512edc0281694df31b4199e7b49fe touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8a4e3b33416faf5b8d228e0ef38e4b67 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 150a195406785da2f06af2f02c2af8d6 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 72a27225e7302e3dffba09702472f5ad touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#VPRED FULL Mode 1
+    test_enc 0 83d23745b69ee0e5664a5420094956f7 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 7ed53547f7bc2a3bb18375facf959100 touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8a843f6ca5c68401bed03dd8a82d1199 touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 b88a31a7576011c83e42f966167b862f signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 821c4679e0d70a2d9b95c1f43a665649 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1dc28875c3c766777b8e5f1be561da5f signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a56535dc515ced01eb9e55e4554bc2c6 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 1 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 821c4679e0d70a2d9b95c1f43a665649 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 cee4db64ada2285678e3e4e00a911033 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 949f1ba1b0c16c600aa41a529b539549 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1d833499f04c9be26f30c53c3a1bf486 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 ddb306d43e15f3060d18669a707c1a59 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 0838d76ccc9ad1b57d3830e44c4b657c touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#VPRED FULL Mode 2
+    test_enc 0 58197355c440f92417d48dcc239cdeed touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6e42636ede408c7605e8b1971751af2b touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 004e596502f344ed104f80b257415126 touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 853c60b6e0442737b2d728d8ed9aabf4 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4c459f45b8dca89c8caddf2a342e00b1 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 fb9bed385133b15488a9a45f23de8bcf signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 0cfcb0bf466a4ddc9438b37034cb36ad signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 1 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4c459f45b8dca89c8caddf2a342e00b1 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9f4d1f922c63289402b2dca1b164844d signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f0247769b922957bb1f5d2b21265722a signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 55887fe4daed48865949bf2c2dc165f2 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 7a048e2e904aec2867a4c74fba068282 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 29dd4b6b45952eb9d79190e78d200296 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#Qunatization uniform
+    test_enc 0 ef27aa3ff5340da6a0f76a8fc2a96619 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --quantization 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9a240cb71bcdc14346a2b0ef850008d3 touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --quantization 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9191ddaafb925e7be5191286153cbdb1 touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 4 --quantization 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2aa8d62b1e6bd2530e52d95cfddeac31 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --quantization 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 7b894c9aa178e1633d06a8edcb2246a5 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --quantization 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 911824d6e9231210309875909b4d8c26 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 3 --quantization 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 b0268959fe2ea6f8cef502f07789107c touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --quantization 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 fb876eae4512a0e946559be1ebc534e5 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --quantization 1 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#slice height
+    test_enc 0 ecaa4f5a8801291529e03185d45bf8b0 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --slice-height 7  --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 0623d51e33a692b57da279a12ca3cf01 touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --slice-height 12 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1476ac5ff5843d751018d0927863bd40 touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 4 --slice-height 18 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6121d1d9b42d6f75d6d1a10967c3a291 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --slice-height 20 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 df896e293d1ab8e6a6a021abe4ecd3dd signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --slice-height 24 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 faed0f11735f960d50f8214c0178e217 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 3 --slice-height 22 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 68fa84f729285337ac56cef3892f8596 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --slice-height 28 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2ac2529a79ad12db2168016f2d3471f9 touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --slice-height 32 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 83c217f89df687e7e37e2b232d41ca1b touchdown_1080p_yuv420p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --slice-height 1080 --rc 0    --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+}
+
+
+#RUN different RC parameters Release/Debug/ ASM_C/ASM_MAX compare Parameters (1:asm) (2:lp number)
+function test_rate_control_signs {
+    asm=${SANITIZER_ASM:-$1}
+    lp=$2
+    cpu_profile=$3
+    packetization_mode=$4
+
+    #Qunatization deadzone
+    test_enc 0 780a15862c05111318e73d078dea3c12 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 0  --rc 0  --coding-signs 2 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 cbb98db43bf5b3d87147058955789875 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 0  --rc 0  --coding-signs 2 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6eac6162d920ddbc954cc81f02f73839 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 0  --rc 0  --coding-signs 2 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    #Qunatization uniform
+    test_enc 0 876b2b38ab24429bed010036e1d226de touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 1  --rc 0  --coding-signs 2 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 467c60b11e4d095426af02ff3ff85e9e touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 1  --rc 0  --coding-signs 2 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 118f0f9d1959b7e5b7b6b763ddcdbc96 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 1  --rc 0  --coding-signs 2 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    #Qunatization deadzone
+    test_enc 0 3dcf8c491104c3602fa9a79c26850ce0 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 0 --rc 0   --coding-signs 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f102ada6cda3d39ade0c2efb1fd7cca0 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 0 --rc 0   --coding-signs 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9f624487b944bccb5e11b26e008b134b signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 0 --rc 0   --coding-signs 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    #Qunatization uniform
+    test_enc 0 fdd91f48a7d4c5aaf9341388bdacea1a touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 1 --rc 0   --coding-signs 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 0490b898ceede2c8d85a966a54684550 touchdown_720p_yuv420p_8_bit_60_frames      "-w 1280 -h 720  --input-depth 8  --colour-format yuv420 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 1 --rc 0   --coding-signs 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2b72c16c35f5f76ea1cc9d3c9a273dcb signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1  --quantization 1 --rc 0   --coding-signs 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+}
+
+#RUN input-msb-aligned Parameters (1:asm) (2:lp number)
+function test_msb_aligned {
+    asm=${SANITIZER_ASM:-$1}
+    lp=$2
+    cpu_profile=$3
+    packetization_mode=$4
+
+#   Explicit msb-aligned=0 must be byte-identical to the default (untouched) path
+    test_enc 0 62764838a69b79251eae1a63d97402e4 touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5 --input-msb-aligned 0   --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   msb-aligned=1 must produce a valid, decodable, deterministic bitstream
+    test_enc 0 a24b2fa13a7524749d7de47e443d9f0b touchdown_1080p_yuv422p_10_bit_le_60_frames "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0 -n 5 --input-msb-aligned 1   --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3d5e7f00ce52f93006f3633fd2530671 signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --input-msb-aligned 1   --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   Reject any value other than 0/1
+    test_enc 5 IGNORE                           signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --input-msb-aligned 2     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           signal_1080p_yuv422p_10bit_le_1_frame       "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --input-msb-aligned 255   --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+}
+
+#(1:expected error code) (2:expected md5 or IGNORE) (3:"all other parameters to encoder")
+#Independent of test_enc/$path_correct - always encodes the self-generated $yuva422_synth file.
+function test_enc_yuva422_synth {
+    exit_code=$1
+    md5=$2
+    encoder_parameters=$3
+
+    common_lib_update_test_id_run_return_1_to_ignore
+    ignore=$?
+    if [ $ignore -ne 0 ]; then
+        return
+    fi
+
+    bin_name="${test_id_print}_yuva422_synth"
+    bin_path="$tmp_dir/$bin_name.jxs"
+    out_yuv_path="$tmp_dir/$bin_name.yuv"
+
+    cmd="$exec_enc -i $yuva422_synth -b $bin_path $encoder_parameters"
+    echo "run command: $cmd"
+    run_cmd "$cmd"
+    ret=$?
+    if [ $ret -ne $exit_code ]; then
+        echo "FAIL Invalid error code: $ret expected: $exit_code"
+        error=1
+        end
+    fi
+
+    if [ $ret -eq 0 ]; then
+        cmd="$exec_dec -i $bin_path -o $out_yuv_path"
+        echo "run command: $cmd"
+        run_cmd "$cmd"
+        ret=$?
+        if [ $ret -ne 0 ]; then
+            echo "FAIL Can not decode bitstream, error code: $ret"
+            error=1
+            end
+        fi
+    fi
+
+    if [ "$md5" = "IGNORE" ]; then
+        echo "IGNORE TEST OUTPUT"
+    else
+        echo -n "Test MD5 Expect: $md5 "
+        md5_t=`md5sum ${bin_path} | awk '{ print $1 }'`
+        if [ "$md5" = "$md5_t" ]; then
+            echo "OK"
+        else
+            echo "FAIL get $md5_t"
+            error=1
+            end
+        fi
+    fi
+}
+
+#RUN yuva422 (4:2:2:4, YUV422 + alpha) new-format smoke test Parameters (1:asm) (2:lp) (3:profile) (4:packetization-mode)
+function test_four_component_alpha {
+    asm=$1
+    lp=$2
+    cpu_profile=$3
+    packetization_mode=$4
+
+    test_enc_yuva422_synth 0 675945159dce818eb7cb18d723916b08 "-w $yuva422_w -h $yuva422_h --input-depth 8 --colour-format yuva422 --bpp 4 --decomp_v 2 --decomp_h 5 --rc 0 -n $yuva422_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc_yuva422_synth 0 a23eb24f36fdf615defd10b58ae727f3 "-w $yuva422_w -h $yuva422_h --input-depth 8 --colour-format yuva422 --bpp 3 --decomp_v 1 --decomp_h 4 --rc 0 -n $yuva422_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc_yuva422_synth 0 dfafdfe43775d1c15d488cbd35529f4c "-w $yuva422_w -h $yuva422_h --input-depth 8 --colour-format yuva422 --bpp 4 --decomp_v 0 --decomp_h 1 --rc 0 -n $yuva422_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   yuva422's Y/Cb/Cr planes have 2:1 horizontal chroma subsampling like plain yuv422 - odd width must be rejected
+    test_enc_yuva422_synth 5 IGNORE "-w $((yuva422_w + 1)) -h $yuva422_h --input-depth 8 --colour-format yuva422 --bpp 4 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+}
+
+#(1:expected error code) (2:expected md5 or IGNORE) (3:"all other parameters to encoder")
+#Independent of test_enc/$path_correct - always encodes the self-generated $yuva444_synth file.
+function test_enc_yuva444_synth {
+    exit_code=$1
+    md5=$2
+    encoder_parameters=$3
+
+    common_lib_update_test_id_run_return_1_to_ignore
+    ignore=$?
+    if [ $ignore -ne 0 ]; then
+        return
+    fi
+
+    bin_name="${test_id_print}_yuva444_synth"
+    bin_path="$tmp_dir/$bin_name.jxs"
+    out_yuv_path="$tmp_dir/$bin_name.yuv"
+
+    cmd="$exec_enc -i $yuva444_synth -b $bin_path $encoder_parameters"
+    echo "run command: $cmd"
+    run_cmd "$cmd"
+    ret=$?
+    if [ $ret -ne $exit_code ]; then
+        echo "FAIL Invalid error code: $ret expected: $exit_code"
+        error=1
+        end
+    fi
+
+    if [ $ret -eq 0 ]; then
+        cmd="$exec_dec -i $bin_path -o $out_yuv_path"
+        echo "run command: $cmd"
+        run_cmd "$cmd"
+        ret=$?
+        if [ $ret -ne 0 ]; then
+            echo "FAIL Can not decode bitstream, error code: $ret"
+            error=1
+            end
+        fi
+    fi
+
+    if [ "$md5" = "IGNORE" ]; then
+        echo "IGNORE TEST OUTPUT"
+    else
+        echo -n "Test MD5 Expect: $md5 "
+        md5_t=`md5sum ${bin_path} | awk '{ print $1 }'`
+        if [ "$md5" = "$md5_t" ]; then
+            echo "OK"
+        else
+            echo "FAIL get $md5_t"
+            error=1
+            end
+        fi
+    fi
+}
+
+#RUN rgba/yuva444 (4:4:4:4) new-format smoke test Parameters (1:asm) (2:lp) (3:profile) (4:packetization-mode)
+function test_four_component_444 {
+    asm=$1
+    lp=$2
+    cpu_profile=$3
+    packetization_mode=$4
+
+    test_enc_yuva444_synth 0 104512a53a78cfe829a6e7b32310d93c "-w $yuva444_w -h $yuva444_h --input-depth 8 --colour-format rgba --bpp 4 --decomp_v 2 --decomp_h 5 --rc 0 -n $yuva444_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc_yuva444_synth 0 86b4c45fd2e8eb9491280aab4d42c3c2 "-w $yuva444_w -h $yuva444_h --input-depth 8 --colour-format yuva444 --bpp 3 --decomp_v 1 --decomp_h 4 --rc 0 -n $yuva444_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc_yuva444_synth 0 d80d4bdea3cef38ff72353417e499179 "-w $yuva444_w -h $yuva444_h --input-depth 8 --colour-format rgba --bpp 4 --decomp_v 0 --decomp_h 1 --rc 0 -n $yuva444_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   4:4:4:4 has no chroma subsampling - odd width must be ACCEPTED (contrast case vs yuva422 above)
+    test_enc_yuva444_synth 0 5028936ad5b408a1439b65052dd422bb "-w $((yuva444_w + 1)) -h $yuva444_h --input-depth 8 --colour-format rgba --bpp 4 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+}
+
+#(1:expected error code) (2:expected md5 or IGNORE) (3:"all other parameters to encoder")
+#Independent of test_enc/$path_correct - always encodes the self-generated $rgb_synth file.
+function test_enc_rgb_synth {
+    exit_code=$1
+    md5=$2
+    encoder_parameters=$3
+
+    common_lib_update_test_id_run_return_1_to_ignore
+    ignore=$?
+    if [ $ignore -ne 0 ]; then
+        return
+    fi
+
+    bin_name="${test_id_print}_rgb_synth"
+    bin_path="$tmp_dir/$bin_name.jxs"
+    out_yuv_path="$tmp_dir/$bin_name.yuv"
+
+    cmd="$exec_enc -i $rgb_synth -b $bin_path $encoder_parameters"
+    echo "run command: $cmd"
+    run_cmd "$cmd"
+    ret=$?
+    if [ $ret -ne $exit_code ]; then
+        echo "FAIL Invalid error code: $ret expected: $exit_code"
+        error=1
+        end
+    fi
+
+    if [ $ret -eq 0 ]; then
+        cmd="$exec_dec -i $bin_path -o $out_yuv_path"
+        echo "run command: $cmd"
+        run_cmd "$cmd"
+        ret=$?
+        if [ $ret -ne 0 ]; then
+            echo "FAIL Can not decode bitstream, error code: $ret"
+            error=1
+            end
+        fi
+    fi
+
+    if [ "$md5" = "IGNORE" ]; then
+        echo "IGNORE TEST OUTPUT"
+    else
+        echo -n "Test MD5 Expect: $md5 "
+        md5_t=`md5sum ${bin_path} | awk '{ print $1 }'`
+        if [ "$md5" = "$md5_t" ]; then
+            echo "OK"
+        else
+            echo "FAIL get $md5_t"
+            error=1
+            end
+        fi
+    fi
+}
+
+#RUN yuv444/rgb (planar, 3-comp, no alpha) and rgbp (packed, 3-comp) pre-existing "Experimental"
+#formats - had zero script-level coverage before. Parameters (1:asm) (2:lp) (3:profile) (4:packetization-mode)
+function test_yuv444_rgb_and_rgbp {
+    asm=$1
+    lp=$2
+    cpu_profile=$3
+    packetization_mode=$4
+
+#   yuv444 and rgb are the SAME enum (COLOUR_FORMAT_PLANAR_YUV444_OR_RGB) - both must byte-match
+    test_enc_rgb_synth 0 2aa52be0dca46b52cf35aa90c22f09a2 "-w $rgb_w -h $rgb_h --input-depth 8 --colour-format yuv444 --bpp 3 --decomp_v 2 --decomp_h 5 --rc 0 -n $rgb_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc_rgb_synth 0 2aa52be0dca46b52cf35aa90c22f09a2 "-w $rgb_w -h $rgb_h --input-depth 8 --colour-format rgb    --bpp 3 --decomp_v 2 --decomp_h 5 --rc 0 -n $rgb_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc_rgb_synth 0 fe53341439e4c38e19ff60196525c5e2 "-w $rgb_w -h $rgb_h --input-depth 8 --colour-format rgb    --bpp 4 --decomp_v 1 --decomp_h 4 --rc 0 -n $rgb_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   rgbp (packed) - single interleaved buffer, distinct enum/code path from planar rgb/yuv444.
+#   Known pre-existing TODO limitation: packed only works in Low latency threading model, not CPU_PROFILE_CPU.
+    if [ "$cpu_profile" = "cpu" ]; then
+        test_enc_rgb_synth 5 IGNORE "-w $rgb_w -h $rgb_h --input-depth 8 --colour-format rgbp   --bpp 3 --decomp_v 2 --decomp_h 5 --rc 0 -n $rgb_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+        test_enc_rgb_synth 5 IGNORE "-w $rgb_w -h $rgb_h --input-depth 8 --colour-format rgbp   --bpp 4 --decomp_v 1 --decomp_h 4 --rc 0 -n $rgb_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    else
+        test_enc_rgb_synth 0 dcacf61dd851bf0277b0b384a8cc109c "-w $rgb_w -h $rgb_h --input-depth 8 --colour-format rgbp   --bpp 3 --decomp_v 2 --decomp_h 5 --rc 0 -n $rgb_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+        test_enc_rgb_synth 0 d4025f84348a247ec4d8c2cb4231a11a "-w $rgb_w -h $rgb_h --input-depth 8 --colour-format rgbp   --bpp 4 --decomp_v 1 --decomp_h 4 --rc 0 -n $rgb_frames --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    fi
+
+#   No chroma subsampling on either format - odd width must be ACCEPTED
+    test_enc_rgb_synth 0 a9f416e4f368dbb37d8ab3169a7e5d7b "-w $((rgb_w + 1)) -h $rgb_h --input-depth 8 --colour-format rgb --bpp 3 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+}
+
+function test_uncommon_resolution {
+    asm=${SANITIZER_ASM:-$1}
+    lp=$2
+    cpu_profile=$3
+    packetization_mode=$4
+
+#   TEST SLICE HEIGHT EQUAL HEIGHT
+    test_enc 5 IGNORE                           uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 2    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1c7a17d33919169a0484d5cc6412d3ec uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 3    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 b89cd922a10eeb40ed91b8550e01e0c8 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 4    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f92e36b6eb6f705210fefbf83d07fbb2 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 5    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c71e81d8fa9c8d1a08d8728a81801a83 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 6    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2ca00d581d49d343a5a3dd485a0634be uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 7    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 015567800684fcbc316b0cd84c959015 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1000 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 79de90e18129c6b2c8dea376229c5fa9 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1001 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c97df6ba0996bc95e6b7e6df559bd335 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1002 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 617665932cef90b98fda6b9de3de2ac0 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1003 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 46014465ba31f7a68c5f821e040057c0 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1004 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 108ac1e9727f5fd94913ec93dd7412f6 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1005 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 b95468f8b59cab005eb0f758b64d567d uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1006 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3e7e698310bee1b07ff74f3f637cfa6a uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1007 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 7da9c8db9fe3619670678e99d5417505 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 2    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f5fce999fefb19ecec55b95688895fee uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 3    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3e8e5b1932b067973fb5d1e14eccd4ea uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 4    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 037f954f947e50a60851de0102fff35f uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 5    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6bd047e41b73816bf84b4831362dfb08 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 6    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e2d041103a4815d82c61c4d0041a7d9b uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 7    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 83b90992f1f90ea127ee686cefe49d02 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1000 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 646a77a87a7b66ebebe6671b2d66803e uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1001 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 84164196f3d230cc4cafa2930d779d52 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1002 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 fd65d34f131605d0f48713dc069b2669 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1003 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1c1b7a1d69685d0bad7598a6db3dcba5 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1004 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 57be63a0e891e80a7645faa3ff5da6c2 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1005 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2924410a121c9536a50e6fd97ae2f81a uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1006 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6a2105c99b88f809b46e8f96072d0aab uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1007 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 83e50795609ca8adc96bc2ec38a09b9a uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 851f41344d7967fd25ecff9aad02d9ce uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 2    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6faa2d367eb774d4d647f79ef1fc5abb uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 3    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8980825601cdf1433557260e8255fac6 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 4    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 019f3d86bd640824471ba16f2303a892 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 5    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 14a7da81611e9968ef648cc0d9004289 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 6    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 89550875a06bbd7b329ba4cfa69f3ac2 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 7    --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e59ee11c7c348a8a3f671d6451e8552c uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1000 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 476c28c35f7c783ae39f755f330c9267 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1001 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6512b33202a1d5078bdefb8c728969f6 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1002 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a7bfa080b586cdf0d14d86347c69491b uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1003 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a67fe61b892337eabfc926be5648d5c0 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1004 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 41ebdf5b86fbffb943dce3b28e8ce12c uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1005 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 21b90edd1d9b09008d6c08f9a7398e5b uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1006 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 de6bae138f88a5546f45b7d58a84fdc4 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1007 --slice-height 5000 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 2    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 3    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e483773b948c4c7edd231d1f3bc2d7d9 uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 4    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 5    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 125f908ef5b2197e76ca371bc2d65c8a uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 6    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 7    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 cae2f137e4e0f0875c596fbcbfcea749 uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1000 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1001 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3f1131254cd58c30868ed2f955d44e3b uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1002 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1003 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 042f14dab92212d0fcbe982022ed208e uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1004 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1005 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d5a870ad76ea9ae3e22ba55bffe4874f uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1006 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1007 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d3c0a9bbada7c5ede0427d7ff16c20c0 uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 2    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 3    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 def3f3f9b7a0105afee20cc29a2c740d uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 4    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 5    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 68e65db73e61272842c7ddde3a98c798 uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 6    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 7    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 163d7fe95f4abf35d8a667233d6101fb uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1000 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1001 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 cb95d0cfc27aeb9d101b70889711a81b uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1002 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1003 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 41ad12fd37d19afc458afa99310afae9 uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1004 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1005 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a1c0c5d5698cabff0ffc3159017a4770 uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1006 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1007 --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 1080    --slice-height 5000 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    #1 precincts 2 slices
+    test_enc 0 e5be1ecbdc93240c7dea2d22ed5906be uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 8   --slice-height 4 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4810e6726833b65149565cabf221347d uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 4   --slice-height 2 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 71379c49a11891a1b5d7e52153353594 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 2   --slice-height 1 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4d1f270b0e297f282ed15947a38c5d3e uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 8   --slice-height 4 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3cd8ebc3d6b7b396142e5930b7cae884 uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 4   --slice-height 2 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    #2 precincts 2 slices
+    test_enc 0 0a6f4b007838df60d0a3cd53053fbf02 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 16  --slice-height 8 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 78dfe7bbb3ee941845ed5e49f3a54f86 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 8   --slice-height 4 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 96ef07cfcdf1e00b3fdf31b0d3c409ac uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 4   --slice-height 2 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c7bd6149c563832fb830bcd6ba649e2d uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 16  --slice-height 8 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e8a36a46bc943d316b07e4afae9d1f2f uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 8   --slice-height 4 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    #3 precincts 2 slices
+    test_enc 0 6a31fc79cc2b7993fc339e7e00f52d29 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 24  --slice-height 12 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9ca40607737a1ce55ac1738a94c70cd6 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 12  --slice-height 6 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8534a2a3d7110082e591f4641379c890 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 6   --slice-height 3 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 0a613626bea8acc018a5995f6f8c3a2b uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 24  --slice-height 12 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 586d36144b7a475ab2406c1149b8900b uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 12  --slice-height 6 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    #5 precincts 2 slices
+    test_enc 0 a9cc3a259c80506ac21cc998ad42ccf3 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 40  --slice-height 20 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 116064a26d985cb042abb189efd813a4 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 20  --slice-height 10 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 10fac07e4f558658000b4142cde30488 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 10  --slice-height 5 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c31ccb4bfcaaafb190a273ff7ffa4cd6 uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 40  --slice-height 20 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6e7a028fd52599589b9811a18a0361ae uncommon_resolution_10bit_420_1928x1080     "-w 1920 -h 20  --slice-height 10 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   TEST HEIGHT 422
+    test_enc 0 59c59302d085270ae95c50f522e56206 uncommon_resolution_8bit_422_1920x1080      "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d527d45c5345d9c7137a5505e465d8f3 uncommon_resolution_8bit_422_1920x1081      "-w 1920 -h 1081 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 fbd9764050b9018e036e94e48ea17b24 uncommon_resolution_8bit_422_1920x1082      "-w 1920 -h 1082 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 bf1a71ed83c5e4b9205e78d194b78d59 uncommon_resolution_8bit_422_1920x1083      "-w 1920 -h 1083 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 0c683d2d926ebe53ac41d32673aefce6 uncommon_resolution_8bit_422_1920x1084      "-w 1920 -h 1084 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 41364c2d65f26bfa67b6da69bd2e0577 uncommon_resolution_8bit_422_1920x1085      "-w 1920 -h 1085 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 221335d11769c37f355865dba5673251 uncommon_resolution_8bit_422_1920x1086      "-w 1920 -h 1086 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 327b858c85636a55238c9c71f452a92b uncommon_resolution_8bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 367a4475f5ce066d5cd638f315c65682 uncommon_resolution_10bit_422_1920x1080     "-w 1920 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 23c58ea0bd2bf74b61942c845450fbb7 uncommon_resolution_10bit_422_1920x1081     "-w 1920 -h 1081 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 284bc967844050d6f18f04aa0a4765e9 uncommon_resolution_10bit_422_1920x1082     "-w 1920 -h 1082 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d7c73a5fb16b22c2be2baff12edfe48d uncommon_resolution_10bit_422_1920x1083     "-w 1920 -h 1083 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3efe27a02a6bbfac4be2ed136111cc5d uncommon_resolution_10bit_422_1920x1084     "-w 1920 -h 1084 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 cec7790d8a9b751f8ff5a2589dfcc358 uncommon_resolution_10bit_422_1920x1085     "-w 1920 -h 1085 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2b916861e081ff6949a6579d54ddb0b2 uncommon_resolution_10bit_422_1920x1086     "-w 1920 -h 1086 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8f0ba8fec2bc36b49633d5e0a7adaa7b uncommon_resolution_10bit_422_1920x1087     "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   Different transformations height
+    test_enc 0 672e2e97445b2a9292bbcf184e9c4351 uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 666208a1d7dd6fbf8e1a92088a05776b uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 ebe459b6b90e7acf09c1d2e405954d41 uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 15c9c36c80511e2dcf8fe4fad09bc9ca uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e754a3690d6e525883cb2bc891d19a70 uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 370b180e4f5bc12d45062f17f58db67f uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 56f4a4951c110a291c75915c4ae9b7bb uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 27c6bf20bf362e01eb591995ba9cb22d uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f350a8927d04619aa0ef808584985cc0 uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2e79ee360ab5ee700080e9ea3ce40a57 uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a33cea0cd81e0030fe44cc02b2a97a66 uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 803c591810c3a27e63abec1f1e1345c0 uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 19296a61f6e665a7b59520d299c91f8d uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 607875b5bffd53e2fdf0aca7d1ddf44d uncommon_resolution_8bit_422_1920x1087       "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 038e91db050d9453eaac71443c42ef00 uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 377ca6744a3cf35e10bb9fa46a8bb3df uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d4a28c30dd11720b7b60844e9cf3ff35 uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 ad6d8a295a61c1c4a9de062ba5be781d uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a210f94e165c6c108c8986d81ad4d967 uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 dc81a70ab58c468c5a3c2c060c14aa7b uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 fd4ed914addb2652f4894df35e66c64b uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 30c97a10cdc6a4a5917d21397c9cca6c uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 da7168961fb184e66b9e35b0a8470e79 uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 70fa30b5e525c7a403959b5dc44c0c8f uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e3a393d5aff708caaab1eda9ef474760 uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 19f728360e5bf771c96885149fce6b6c uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 34e2445a977994fd9ce9638fdd9eaf20 uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a4472275048ce1e093763b4aa3d18f48 uncommon_resolution_10bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   TEST WIDTH 422
+    test_enc 0 b8da0cf006b43b829ad804039a184853 uncommon_resolution_8bit_422_1922x1080        "-w 1922 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9931b51f5f3d3a414f39055680b283d7 uncommon_resolution_8bit_422_1924x1080        "-w 1924 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e50b54c0926684fede0a344f1dce2e5f uncommon_resolution_8bit_422_1926x1080        "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 fa8a3ca778dc61077fba4f356cb14d07 uncommon_resolution_10bit_422_1922x1080       "-w 1922 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c5b8f79c055ef110eae3382d509680e2 uncommon_resolution_10bit_422_1924x1080       "-w 1924 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6c4c7d0a3c5971079ed68daddf1f7bda uncommon_resolution_10bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   Different transformations width
+    test_enc 0 490d63adb494d1ca12084ab47313ee91 uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9448a90741911731d484b087c1c81645 uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2b7cb094bc67b00fac3b6296ac81ec0f uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 982c642862dde8cea561fc3793701a29 uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 810f5edb4b746875af6b97033605471b uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4d378e246a0ff55791406d072818904c uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d5fa0950823915646faa424338757121 uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 afb141b48170c0f80d8fd0d8d5aad54e uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9719b53e267addd36edb6eddf255144f uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 adc3edbd314012c73336b1a1a199e111 uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f6a57f7087da9ec66a7c8831b89c5586 uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a3212bfa34becd4e99ee1ef84288aa42 uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4897180b364de2684196189424c2d1e1 uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a6367d2377c76b99a9e25f848477973a uncommon_resolution_8bit_422_1926x1080       "-w 1926 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8f5d59a5fe4525370896048fe6e927cc uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 ab2af5f581971afb2e2fa57c18d6120e uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c45270fe9ccbf197f36af7fa03874ccc uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 62ce91fa7ae0727c7d601f65798cb6a6 uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 33373bf0c91982aba9e20a8654cebdc1 uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a2e102cff196012a54472bc5ab4a7558 uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 072735a87786c9e155ebb16ec3afc6c4 uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8830d66128ac231461e15c8b616025f1 uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 5512c94e76de4894f0eaf5eda361ee57 uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f8147bff39430fdcecfaa6b880b7b52e uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 7b4a1ac7385583c83243720202629947 uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 96c3d6b50ac2986a0f17d4e9059685ab uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 3 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9ba5116f3afdac673a2369b037119a53 uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 51ee17f27b977e4a6a24f1c8aa976f81 uncommon_resolution_10bit_422_1926x1080      "-w 1926 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 1 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#  ERROR config handle
+    test_enc 5 IGNORE                           uncommon_resolution_8bit_422_1926x1080       "-w 1921 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_8bit_422_1926x1080       "-w 1923 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_8bit_422_1926x1080       "-w 1925 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_422_1926x1080      "-w 1921 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_422_1926x1080      "-w 1923 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_422_1926x1080      "-w 1925 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#   YUV420
+    test_enc 0 325c6db83b023ab59e5639ab40eb9169 uncommon_resolution_8bit_420_1922x1082       "-w 1922 -h 1082 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 679331bfa30b2e446d05ed5357809f06 uncommon_resolution_8bit_420_1924x1084       "-w 1924 -h 1084 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 606b1907b84bcb4cd5d7f38c684f318f uncommon_resolution_8bit_420_1926x1086       "-w 1926 -h 1086 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f2e5e90d19961081851f6eeccd37d5e0 uncommon_resolution_8bit_420_1928x1088       "-w 1928 -h 1088 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 afd3a8a8db3d9e9ba698801beaaf4814 uncommon_resolution_8bit_420_1920x1088       "-w 1920 -h 1088 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a67410bd719526c4b0d17f302a7e7fcd uncommon_resolution_8bit_420_1928x1080       "-w 1928 -h 1080 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e410a5030466aca267289bf37ce3a078 uncommon_resolution_10bit_420_1922x1082      "-w 1922 -h 1082 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4d3a0831fa580889d3c3c9fd8aa3e50e uncommon_resolution_10bit_420_1924x1084      "-w 1924 -h 1084 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 41123eb62de5291ff04b5c7314fa6f7c uncommon_resolution_10bit_420_1926x1086      "-w 1926 -h 1086 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3442e96befc12dd2cc832b96e376acae uncommon_resolution_10bit_420_1928x1088      "-w 1928 -h 1088 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3ea39dd5f46129a1f0ce302477258635 uncommon_resolution_10bit_420_1920x1088      "-w 1920 -h 1088 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3d8387bede226a3e437496a4d7cc022d uncommon_resolution_10bit_420_1928x1080      "-w 1928 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 5 IGNORE                           uncommon_resolution_8bit_420_1928x1088       "-w 1921 -h 1080 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_8bit_420_1928x1088       "-w 1920 -h 1081 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_8bit_420_1928x1088       "-w 1923 -h 1080 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_8bit_420_1928x1088       "-w 1920 -h 1083 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1088      "-w 1921 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1088      "-w 1920 -h 1081 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1088      "-w 1923 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           uncommon_resolution_10bit_420_1928x1088      "-w 1920 -h 1083 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#VPRED MODE 1
+    test_enc 0 5d1e612e89f1b50f626dc95dc4b2b16e uncommon_resolution_8bit_422_1920x1081      "-w 1920 -h 1081 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1b0217daf174c0ce0099d4257ae2d2d9 uncommon_resolution_8bit_422_1920x1083      "-w 1920 -h 1083 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e581fa1fcfd9d64be3171601ecbb9117 uncommon_resolution_8bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 5fed8209342db695312cee5679a73006 uncommon_resolution_10bit_422_1920x1081     "-w 1920 -h 1081 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 35be53e29e010e256f6a65287068650c uncommon_resolution_10bit_422_1920x1085     "-w 1920 -h 1085 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1b96d0ca43d37c0a98368bfb24a7b734 uncommon_resolution_8bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e15b70bb0807b8926494c2923057b454 uncommon_resolution_8bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6f7d79392c22e94c50b937581e6a253c uncommon_resolution_8bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1f06074652d19345ed2a7247d1e2071a uncommon_resolution_10bit_422_1920x1087     "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 ac8059e421a0b28c2bccc06a8c4a4337 uncommon_resolution_10bit_422_1920x1087     "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 bb6d36353b59f88369119837144293a8 uncommon_resolution_10bit_422_1920x1087     "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2713c516ec14f04d997921101923e2f7 uncommon_resolution_8bit_422_1922x1080      "-w 1922 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9706ecdb65e3d739989c80ad919d3257 uncommon_resolution_10bit_422_1922x1080     "-w 1922 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 dba005a482ccaa2b10519384a2ec53a3 uncommon_resolution_8bit_420_1922x1082      "-w 1922 -h 1082 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 349d5ec300357ff59256a7913923283c uncommon_resolution_8bit_420_1924x1084      "-w 1924 -h 1084 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 b5b7468b0219f9e1db7c1ebad7129a91 uncommon_resolution_8bit_420_1926x1086      "-w 1926 -h 1086 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 0f0d55ea20be25d01f91bc664f4d25a3 uncommon_resolution_8bit_420_1928x1088      "-w 1928 -h 1088 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 63f8d756bd93571fe9233b49e7d8c39a uncommon_resolution_8bit_420_1920x1088      "-w 1920 -h 1088 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 973a758790c8ab33d12fcacc3a93a1d4 uncommon_resolution_8bit_420_1928x1080      "-w 1928 -h 1080 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4e04e623dccabf7838f2f0ff7f6b87e7 uncommon_resolution_10bit_420_1922x1082     "-w 1922 -h 1082 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 cad6bf5389e6cf60e1aabb990b82be62 uncommon_resolution_10bit_420_1924x1084     "-w 1924 -h 1084 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c39b70a18a37581bfeee383f5a356114 uncommon_resolution_10bit_420_1926x1086     "-w 1926 -h 1086 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 3b42b9487794e5bb4f78bdcf056cb5b6 uncommon_resolution_10bit_420_1928x1088     "-w 1928 -h 1088 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a62fd3251d2bd3c39de5412e60eff195 uncommon_resolution_10bit_420_1920x1088     "-w 1920 -h 1088 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a3b2fdbecc94d4dddad9c2afd5c2548f uncommon_resolution_10bit_420_1928x1080     "-w 1928 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 1 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+#VPRED MODE 2
+    test_enc 0 cd18cc512fd7300d5a6f59f347306f14 uncommon_resolution_8bit_422_1920x1081      "-w 1920 -h 1081 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d8b0f663127b995c82406b3a9d0db3b3 uncommon_resolution_8bit_422_1920x1083      "-w 1920 -h 1083 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f33302cb7139a2ea502618309c614210 uncommon_resolution_8bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 910251304819aaea5c3df77fccac019e uncommon_resolution_10bit_422_1920x1085     "-w 1920 -h 1085 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2a6a97194cd5e01026504f7cac81a27b uncommon_resolution_10bit_422_1920x1081     "-w 1920 -h 1081 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 0ed5f567fbfc0f714d5667518209551c uncommon_resolution_8bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 551465927aef02ced7932bd97b654443 uncommon_resolution_8bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 1 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d0cf2db47305bbd75bde6bada8bc9036 uncommon_resolution_8bit_422_1920x1087      "-w 1920 -h 1087 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 317ed42f4f4b4507501f3b1db7a1212d uncommon_resolution_10bit_422_1920x1087     "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9f2253a2ad557e91cbe3208a65aff177 uncommon_resolution_10bit_422_1920x1087     "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 1 --decomp_h 2 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 0cd3bd1e735a85354efa6f5a83a9f1f7 uncommon_resolution_10bit_422_1920x1087     "-w 1920 -h 1087 --input-depth 10 --colour-format yuv422 --bpp 4 --decomp_v 0 --decomp_h 2 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e54843a2a71b39970425f9a785d1447d uncommon_resolution_8bit_422_1922x1080      "-w 1922 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 12090b235623c50f5842b5467198a1d8 uncommon_resolution_10bit_422_1922x1080     "-w 1922 -h 1080 --input-depth 10 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 603a8c5b457eb25ccdf459fc49841ae0 uncommon_resolution_8bit_420_1922x1082      "-w 1922 -h 1082 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 b73941a86ee3d092a9dbb8dd7f4411ab uncommon_resolution_8bit_420_1924x1084      "-w 1924 -h 1084 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 0402f786031c46994f5d72a66354737b uncommon_resolution_8bit_420_1926x1086      "-w 1926 -h 1086 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 a433e4a4db1602034f886b1f8cac0bdd uncommon_resolution_8bit_420_1928x1088      "-w 1928 -h 1088 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d9e26c7139dc29f256e6c71c23d024d8 uncommon_resolution_8bit_420_1920x1088      "-w 1920 -h 1088 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 485cbd31982c4179df1b25f86fe66f9e uncommon_resolution_8bit_420_1928x1080      "-w 1928 -h 1080 --input-depth 8  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8632579fa9b136a28f42b383ef8de409 uncommon_resolution_10bit_420_1922x1082     "-w 1922 -h 1082 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 6bc491492b340412b1a16b3e38683da4 uncommon_resolution_10bit_420_1924x1084     "-w 1924 -h 1084 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d165c743da45b84654c47fa173963417 uncommon_resolution_10bit_420_1926x1086     "-w 1926 -h 1086 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 f17e5abfa40657e32e964d574c2bc8d7 uncommon_resolution_10bit_420_1928x1088     "-w 1928 -h 1088 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 2b74a655ec4281ff1b1f052454718ff0 uncommon_resolution_10bit_420_1920x1088     "-w 1920 -h 1088 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 781030d40ba93dcf4b6cf2d73fc6af43 uncommon_resolution_10bit_420_1928x1080     "-w 1928 -h 1080 --input-depth 10 --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 2 --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+}
+
+function test_handle_errors {
+    asm=${SANITIZER_ASM:-$1}
+    lp=$2
+    cpu_profile=$3
+    packetization_mode=$4
+    #Some images are only random yuv to tests
+
+    #Test error handling 1000 times RC should return error
+    test_enc 11 IGNORE                           small_422_8bit_32x32-small-blank-small       "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 2 -n 1000 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0  --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    #Unsuported Decomposition
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 40 --decomp_v 2 --decomp_h 6 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 40 --decomp_v 3 --decomp_h 5 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 40 --decomp_v 2 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 1920 -h 1080 --input-depth 8  --colour-format yuv422 --bpp 40 --decomp_v 0 --decomp_h 0 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 1920 -h 1080 --input-depth 8  --colour-format yuv420 --bpp 10 --decomp_v 0 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    #Invalid sizes
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 1 -h 1 --input-depth 8  --colour-format yuv422 --bpp 40   --decomp_v 0 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 2 -h 1 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 0 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c2396e83a8ac4dbdfbcfa7aec86d8bd3 touchdown_1080p_yuv422p_8_bit_60_frames      "-w 4 -h 1 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 0 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 4 -h 1 --input-depth 8  --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e8dae98d02ea3c537bdc7aa49eb9ecd1 touchdown_1080p_yuv422p_8_bit_60_frames      "-w 4 -h 2 --input-depth 8  --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 4 -h 2 --input-depth 8  --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1830a4e426d7f558f7036b7c289eef57 touchdown_1080p_yuv422p_8_bit_60_frames      "-w 8 -h 2 --input-depth 8  --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 8 -h 2 --input-depth 8  --colour-format yuv420 --bpp 1000 --decomp_v 2 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 bedeb61d09ba0be408d9c4a719807abb touchdown_1080p_yuv422p_8_bit_60_frames      "-w 8 -h 4 --input-depth 8  --colour-format yuv420 --bpp 1000 --decomp_v 2 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 5 IGNORE                           touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 1 -h 1 --input-depth 10 --colour-format yuv422 --bpp 40   --decomp_v 0 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 2 -h 1 --input-depth 10 --colour-format yuv422 --bpp 1000 --decomp_v 0 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e195315c7effbedf6d973f4e61e9d9a0 touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 4 -h 1 --input-depth 10 --colour-format yuv422 --bpp 1000 --decomp_v 0 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 4 -h 1 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 5fd001a1558ecf4edaec154160c05a82 touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 4 -h 2 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 4 -h 2 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 17a86f453d8c3325caf94411ba0e2bfd touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 8 -h 2 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 8 -h 2 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 2 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 5e9a78712de067d8c4320ba048c77d1e touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 8 -h 4 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 2 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    #Too big decomposition for small sizes
+    test_enc 0 19f9f73b11dd0ab7be06aeb2dc35c323 touchdown_1080p_yuv422p_8_bit_60_frames      "-w 4 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 0 --decomp_h 1 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 4 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 0 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 4 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 3 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 cbafa687488db7958cfa4c77b9c40c00 touchdown_1080p_yuv422p_8_bit_60_frames      "-w 6 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 d2dc466698df810d003ec1ea6cf2e459 touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 6 -h 64 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 6 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 3 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 745992139bd16ee87e1cd0e2a5ddf7f4 touchdown_1080p_yuv422p_8_bit_60_frames      "-w 8 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 06023e467b04eaddf8bb1f12aebf1e2a touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 8 -h 64 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 2 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 8 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 3 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 8 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 4 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 de819e791cdbbf2d557e5c1ac52a609d touchdown_1080p_yuv422p_8_bit_60_frames      "-w 16 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 3 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 91f9f267873a1d4d7138965930de761d touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 16 -h 64 --input-depth 8  --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 3 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 16 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 4 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 cb32341f35193e0268ea71e3636e119e touchdown_1080p_yuv422p_8_bit_60_frames      "-w 30 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 4 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 bf1e7ccdb14d750128e317b7dd4a581b touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 30 -h 64 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 4 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 30 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 5 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 8bdd56f3bcb7bef85928bdb9ccc58c05 touchdown_1080p_yuv422p_8_bit_60_frames      "-w 32 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 4 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 ffcf12812e5dc03164b8d71deaeec52d touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 32 -h 64 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 4 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 5 IGNORE                           touchdown_1080p_yuv422p_8_bit_60_frames      "-w 32 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 5 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 23a078a62447c0f36c69271b6f4b54a3 touchdown_1080p_yuv422p_8_bit_60_frames      "-w 34 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 4 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 cf100394baa38fb3b971ab65e84db452 touchdown_1080p_yuv422p_8_bit_60_frames      "-w 34 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 1 --decomp_h 5 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1925119d6859079e7cbb9b979785b3d5 touchdown_1080p_yuv422p_8_bit_60_frames      "-w 34 -h 64 --input-depth 8  --colour-format yuv422 --bpp 1000 --decomp_v 2 --decomp_h 5 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 0 d3c894f48cdf01ad0a22e890b4ea6581 touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 34 -h 64 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 4 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e601cba40789e22df3b4afab3302ff80 touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 34 -h 64 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 1 --decomp_h 5 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 c02658280bc64df4cbb71f25b0a1465d touchdown_1080p_yuv420p_10_bit_le_60_frames  "-w 34 -h 64 --input-depth 10 --colour-format yuv420 --bpp 1000 --decomp_v 2 --decomp_h 5 --coding-vpred 2 --rc 0 -n 1 --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 5  IGNORE                          small_422_8bit_32x32-small-blank-small      "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 0 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0  --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 54bff8b8125777a545b15354cf3d0cfa small_422_8bit_32x32-small-blank-small      "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 6 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0  --rc 0      --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+
+    test_enc 5  IGNORE                          small_422_8bit_32x32-small-blank-small      "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 0 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0   --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 11 IGNORE                          small_422_8bit_32x32-small-blank-small      "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 1 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0   --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 11 IGNORE                          small_422_8bit_32x32-small-blank-small      "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 2 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0   --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 11 IGNORE                          small_422_8bit_32x32-small-blank-small      "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0   --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 11 IGNORE                          small_422_8bit_32x32-small-blank-small      "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 4 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0   --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 11 IGNORE                          small_422_8bit_32x32-small-blank-small      "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 5 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0   --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 11 IGNORE                          small_422_8bit_32x32-small-blank-small      "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 5.5 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0 --rc 0       --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 54bff8b8125777a545b15354cf3d0cfa small_422_8bit_32x32-small-blank-small      "-w 32 -h 32 --input-depth 8  --colour-format yuv422 --bpp 6 --decomp_v 2 --decomp_h 4 --coding-sigf 1 --coding-vpred 0   --rc 0     --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+}
+
+
+#RUN different RC parameters Release/Debug/ ASM_C/ASM_MAX compare Parameters (1:asm) (2:lp number)
+function test_invalid_yuv {
+    asm=${SANITIZER_ASM:-$1}
+    lp=$2
+    cpu_profile=$3
+    packetization_mode=$4
+
+#   Use 8bit YUV as unpacked 10 bit YUV, values in YUV out of a range
+    test_enc 0 551f6a9214347df7d53ac856c087a504 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e846cbc631e0703dc145536d3e2c67f2 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 4 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 643a421a8c4816bb4d2a1cc876c44045 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 3 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 08093e046d5a222aec52eaf543f5e17c touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 63b10cc1b3c5b29aee83bf15d6dde605 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 5 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 1b77342bf391138ca60d35b2137b1b51 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 4 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 9d81fc5b263ac46a027c5dbd8e7bcc44 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 3 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 5aceced8a3bdb5a805f24becb0c61fe3 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 8c04eb4c0aded91163943860fe075569 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 1 --decomp_h 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 703d23b2b5fa32faa34704fb41b48f17 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 5 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 e43ea194058a45324ea6b8824e3d52fe touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 4 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 fa826e9eab932f6999d0d8548ff066b3 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 3 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 da9a60ffad7f4c716c1925677494b14b touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 2 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 33a08fb6e097ec4a200b7461d5da51cc touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv422 --bpp 3 --decomp_v 0 --decomp_h 1 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+    test_enc 0 4fd58a291a45851b13edfab0415900e2 touchdown_1080p_yuv422p_8_bit_60_frames     "-w 1920 -h 1080 --input-depth 10  --colour-format yuv420 --bpp 3 --decomp_v 2 --decomp_h 5 --rc 0 -n 5  --asm $asm --lp $lp --profile $cpu_profile --packetization-mode $packetization_mode"
+}
+
+echo RUN SAMPLE ENCODER TEST
+exec_enc=$exec_enc_rel
+#test_enc 0 a0648fc4fe92b33ffa5edfe75b370fbd touchdown_1080p_yuv422p_8_bit_60_frames "-w 1920 -h 1080 --input-depth 8 --colour-format yuv422 --bpp 3 --decomp_v 2 --decomp_h 5 --coding-sigf 1 --coding-vpred 0 --asm max --lp 2"
+
+echo RUN RELEASE TEST AVX
+exec_enc=$exec_enc_rel
+[[ $run_fast -eq 0 ]] && test_rate_control c 10 latency 0
+[[ $run_fast -eq 0 ]] && test_rate_control avx2 5 cpu 0
+                         test_rate_control max 7 latency 0
+                         test_rate_control max 7 latency 1
+
+[[ $run_fast -eq 0 ]] && test_rate_control_signs c 10 latency 0
+[[ $run_fast -eq 0 ]] && test_rate_control_signs avx2 5 cpu 0
+                         test_rate_control_signs max 7 latency 0
+                         test_rate_control_signs max 7 latency 1
+
+echo Test MSB-aligned input
+[[ $run_fast -eq 0 ]] && test_msb_aligned c 10 latency 0
+[[ $run_fast -eq 0 ]] && test_msb_aligned avx2 5 cpu 0
+                         test_msb_aligned max 7 latency 0
+                         test_msb_aligned max 7 latency 1
+
+echo "Test yuva422 (4:2:2:4, YUV422+alpha)"
+[[ $run_fast -eq 0 ]] && test_four_component_alpha c 10 latency 0
+[[ $run_fast -eq 0 ]] && test_four_component_alpha avx2 5 cpu 0
+                         test_four_component_alpha max 7 latency 0
+                         test_four_component_alpha max 7 latency 1
+
+echo "Test rgba/yuva444 (4:4:4:4)"
+[[ $run_fast -eq 0 ]] && test_four_component_444 c 10 latency 0
+[[ $run_fast -eq 0 ]] && test_four_component_444 avx2 5 cpu 0
+                         test_four_component_444 max 7 latency 0
+                         test_four_component_444 max 7 latency 1
+
+echo "Test yuv444/rgb (planar) and rgbp (packed)"
+[[ $run_fast -eq 0 ]] && test_yuv444_rgb_and_rgbp c 10 latency 0
+[[ $run_fast -eq 0 ]] && test_yuv444_rgb_and_rgbp avx2 5 cpu 0
+                         test_yuv444_rgb_and_rgbp max 7 latency 0
+                         test_yuv444_rgb_and_rgbp max 7 latency 1
+
+#echo RUN DEBUG TEST C
+#exec_enc=$exec_enc_dbg
+#test_rate_control C 1
+
+echo Test Uncommon resolution
+[[ $run_fast -eq 0 ]] && test_uncommon_resolution c 10 latency 0
+                         test_uncommon_resolution avx2 10 latency 0
+[[ $run_fast -eq 0 ]] && test_uncommon_resolution avx2 1 cpu 0
+[[ $run_fast -eq 0 ]] && test_uncommon_resolution max 10 latency 0
+[[ $run_fast -eq 0 ]] && test_uncommon_resolution avx2 1 cpu 1
+[[ $run_fast -eq 0 ]] && test_uncommon_resolution max 10 latency 1
+
+echo Test Handle errors
+[[ $run_fast -eq 0 ]] && test_handle_errors c 2 cpu 0
+                         test_handle_errors avx2 2 latency 0
+                         test_handle_errors avx2 2 latency 1
+
+echo Test Handle Invalid Input YUV
+[[ $run_fast -eq 0 ]] && test_invalid_yuv c 10 latency 0
+[[ $run_fast -eq 0 ]] && test_invalid_yuv c 10 cpu 0
+                         test_invalid_yuv avx2 10 latency 0
+[[ $run_fast -eq 0 ]] && test_invalid_yuv avx2 1 cpu 0
+[[ $run_fast -eq 0 ]] && test_invalid_yuv max 10 latency 0
+[[ $run_fast -eq 0 ]] && test_invalid_yuv max 10 cpu 0
+[[ $run_fast -eq 0 ]] && test_invalid_yuv max 10 latency 1
+[[ $run_fast -eq 0 ]] && test_invalid_yuv max 10 cpu 1
+
+common_lib_end_summary
+
+echo "DONE Encoder OK"
+error=0
+end
