@@ -592,6 +592,124 @@ static void bench_phase4_full_frame(BenchReport& report, uint32_t width, uint32_
 }
 #endif
 
+#ifdef SVT_ENABLE_CUDA
+/* Phase 4c 追加検証: bench_phase4_full_frame() above reuses ONE host input
+ * buffer (fixed address) across all `iterations` calls to
+ * svt_cuda_encode_frame(), so its ~7ms figure is implicitly a best-case
+ * "fixed address" number. svt_cuda_encode_frame()'s CUDA-Graph capture
+ * (EncodeFrameCuda.cu) bakes each in_planes[c] HOST pointer directly into
+ * graph1's captured cudaMemcpy2DAsync node (DwtCuda.cu's
+ * svt_cuda_dwt_component_ctx() copies straight from the caller's raw
+ * in_plane pointer into the persistent device buffer) -- confirmed by
+ * reading efc_graph1_needs_recapture(), which recaptures whenever
+ * ctx->cap_in_planes[c] != in_planes[c]. This benchmark measures, per
+ * frame, what that costs in two realistic continuous-video-encode patterns:
+ *   Scenario A: every frame's pixel buffer is a genuinely new host
+ *               allocation (the naive/common case for a caller that doesn't
+ *               think about this).
+ *   Scenario B: exactly two fixed host buffers are allocated once and
+ *               reused round-robin (a standard double-buffering scheme).
+ * Each scenario gets its own freshly-created SvtCudaFrameContext so the
+ * unavoidable very-first-call graph1+graph2 capture cost doesn't bleed from
+ * one scenario's timing into the other's.
+ */
+static void bench_phase4_recapture_behavior(uint32_t width, uint32_t height, int num_frames) {
+    svt_jpeg_xs_encoder_api_t enc;
+    if (svt_jpeg_xs_encoder_load_default_parameters(SVT_JPEGXS_API_VER_MAJOR, SVT_JPEGXS_API_VER_MINOR, &enc) != SvtJxsErrorNone)
+        return;
+    enc.verbose = VERBOSE_NONE;
+    enc.source_width = width;
+    enc.source_height = height;
+    enc.input_bit_depth = 10;
+    enc.colour_format = COLOUR_FORMAT_PLANAR_YUV422;
+    enc.bpp_numerator = 4;
+    enc.bpp_denominator = 1;
+    enc.threads_num = 1;
+    enc.slice_height = height;
+    enc.rate_control_mode = RC_CBR_PER_PRECINCT;
+
+    svt_jpeg_xs_image_config_t image_config;
+    uint32_t bytes_per_frame = 0;
+    if (svt_jpeg_xs_encoder_get_image_config(SVT_JPEGXS_API_VER_MAJOR, SVT_JPEGXS_API_VER_MINOR, &enc, &image_config,
+                                             &bytes_per_frame) != SvtJxsErrorNone)
+        return;
+
+    if (svt_jpeg_xs_encoder_init(SVT_JPEGXS_API_VER_MAJOR, SVT_JPEGXS_API_VER_MINOR, &enc) != SvtJxsErrorNone) {
+        return;
+    }
+
+    svt_jpeg_xs_encoder_api_prv_t* prv = (svt_jpeg_xs_encoder_api_prv_t*)enc.private_ptr;
+    svt_jpeg_xs_encoder_common_t* enc_common = &prv->enc_common;
+    pi_t* pi = &enc_common->pi;
+    if (pi->slice_num != 1) {
+        svt_jpeg_xs_encoder_close(&enc);
+        printf("Phase4c-Recapture: SKIPPED (unexpected slice_num=%u)\n", pi->slice_num);
+        return;
+    }
+
+    uint32_t slice_budget_bytes = enc_common->picture_header_dynamic.hdr_Lcod - enc_common->frame_header_length_bytes -
+        SLICE_HEADER_SIZE_BYTES - CODESTREAM_SIZE_BYTES;
+    std::vector<uint32_t> precinct_budgets(pi->precincts_line_num);
+    {
+        uint32_t min_budget = slice_budget_bytes / pi->precincts_line_num;
+        uint32_t left = slice_budget_bytes - min_budget * pi->precincts_line_num;
+        for (uint32_t i = 0; i < pi->precincts_line_num; i++) {
+            precinct_budgets[i] = min_budget + (i < left ? 1 : 0);
+        }
+    }
+    std::vector<uint8_t> precinct_data(slice_budget_bytes + 4096, 0);
+
+    auto run_scenario = [&](const char* name, int num_bufs) {
+        SvtCudaFrameContext ctx;
+        memset(&ctx, 0, sizeof(ctx));
+        if (svt_cuda_frame_context_create_from_pi(&ctx, pi, &enc_common->pi_enc, slice_budget_bytes + 4096) != 0) {
+            printf("Phase4c-Recapture: %s SKIPPED (context creation failed)\n", name);
+            return;
+        }
+
+        std::vector<svt_jpeg_xs_image_buffer_t*> bufs(num_bufs);
+        for (int i = 0; i < num_bufs; i++) {
+            bufs[i] = svt_jpeg_xs_image_buffer_alloc(&image_config);
+            for (int32_t c = 0; c < image_config.components_num; ++c) {
+                memset(bufs[i]->data_yuv[c], 0x55 + (i & 0xF), bufs[i]->alloc_size[c]);
+            }
+        }
+        printf("\n-- Phase4c-Recapture: %s (%d distinct address%s) --\n", name, num_bufs, num_bufs == 1 ? "" : "es");
+        for (int f = 0; f < num_frames; f++) {
+            svt_jpeg_xs_image_buffer_t* in_buf = bufs[f % num_bufs];
+            const void* in_planes[FCC_MAX_COMPONENTS] = {NULL, NULL, NULL, NULL};
+            uint32_t in_stride[FCC_MAX_COMPONENTS] = {0, 0, 0, 0};
+            for (uint32_t c = 0; c < pi->comps_num; c++) {
+                in_planes[c] = in_buf->data_yuv[c];
+                in_stride[c] = in_buf->stride[c];
+            }
+            CpuTimer timer;
+            timer.start();
+            uint32_t used = 0;
+            int rc = svt_cuda_encode_frame(&ctx, in_planes, in_stride, pi->decom_h, pi->decom_v, enc.input_bit_depth,
+                                           enc_common->picture_header_dynamic.hdr_Bw, enc_common->picture_header_dynamic.hdr_Fq,
+                                           (uint8_t)enc_common->picture_header_dynamic.hdr_Qpih, (uint8_t)pi->use_short_header,
+                                           (uint8_t)enc_common->coding_significance, enc_common->pi_enc.max_quantization,
+                                           enc_common->pi_enc.max_refinement, precinct_budgets.data(), pi->bands_num_exists,
+                                           (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, precinct_data.data(),
+                                           &used);
+            double ms = timer.stop_ms();
+            printf("  frame %2d: %7.3f ms  (addr=%p)%s\n", f, ms, (void*)in_buf->data_yuv[0], rc != 0 ? "  [ERROR]" : "");
+        }
+
+        for (int i = 0; i < num_bufs; i++) {
+            svt_jpeg_xs_image_buffer_free(bufs[i]);
+        }
+        svt_cuda_frame_context_destroy(&ctx);
+    };
+
+    run_scenario("Scenario A: fully distinct address every frame", num_frames);
+    run_scenario("Scenario B: double buffering (2 fixed addresses)", 2);
+
+    svt_jpeg_xs_encoder_close(&enc);
+}
+#endif
+
 int main(int argc, char** argv) {
     // The C reference functions dispatch through RTCD (runtime CPU
     // detection) function pointers that are otherwise left uninitialized
@@ -622,6 +740,13 @@ int main(int argc, char** argv) {
     // Phase 4a: full single-frame CUDA encode (persistent context reused
     // across iterations) vs a full real CPU encode of the same 4K/10bit image.
     bench_phase4_full_frame(report, 3840, 2160, 20);
+
+    // Phase 4c 追加検証: per-frame latency under rotating input addresses
+    // (Scenario A) vs double buffering (Scenario B), to check whether
+    // graph-capture recapture cost shows up in realistic continuous video
+    // encoding, since bench_phase4_full_frame() above reuses one fixed
+    // address across all its iterations.
+    bench_phase4_recapture_behavior(3840, 2160, 10);
 
     double mean_ms = 0.0, min_ms = 0.0, max_ms = 0.0;
     int err = svt_cuda_smoke_bench(iterations, &mean_ms, &min_ms, &max_ms);

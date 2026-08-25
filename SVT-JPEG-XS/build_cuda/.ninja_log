@@ -169,3 +169,5 @@
 1254	1423	8094012107189577	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
 48	258	8094012309757001	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	a48ec7a9a41966fb
 43	209	8094014245889950	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340
+46	772	8094021282000837	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/main.cpp.obj	4ac61ce05a884daa
+773	948	8094021289270291	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340
