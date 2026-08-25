@@ -217,6 +217,28 @@ precinctバイト長など)をダンプし、CUDAカーネルの出力とビッ�
            版を上回り、33ms現実目標は達成、16ms理想目標は未達**。詳細は計画ファイル
            (セクション11)のPhase 4b-1完了サマリを参照。
 
+           [Phase 4b-2完了] `svt_cuda_encode_frame()`をCUDA Graph化(graph1:
+           DWT+NLT+GC/significance+RC-LUT構築、graph2: RC結果反映+量子化+Pack。間の
+           ホスト側二分探索はGraph外のまま)。残存per-call malloc/freeもすべて永続バッファへ
+           移行。bit-exact: `*Cuda*`テスト20/20 pass(Graph replay経路も検証、無回帰)。全回帰
+           12057件中12055件パス。実測: CUDA full-frame 19.98ms→18.43ms、CPU参照23.55ms
+           (再計測)。**33ms現実目標は達成継続、16ms理想目標は依然未達**。Nsightプロファイル
+           の結果、DWTの素朴な1D liftingカーネル(`k_horizontal_lift`/`k_vertical_lift`)が
+           GPUカーネル時間の約91.6%を占めることが判明——CUDA Graph化でカーネル起動
+           オーバーヘッドは解消済みで、残る唯一のボトルネックはDWTカーネル自体の実行時間。
+           今後の最有力候補はDWTのタイル化・shared memory化だが、構造的に大きい変更のため
+           今回は未着手(推奨事項として記録)。詳細は計画ファイル(セクション11)の
+           Phase 4b-2完了サマリを参照。
+
+  Phase 4c: DWTタイル化・shared memory最適化(16ms理想目標達成を目指し着手)。
+           [スコープ確定] Phase4b-2のNsight結果からDWTカーネル自体の実行時間が唯一の
+           残存ボトルネックと判明したため、`DwtCuda.cu`の`k_horizontal_lift`/
+           `k_vertical_lift`(1D・1スレッド=1行/1列の素朴な実装)をshared memoryタイル化
+           (ブロック単位でのタイル+lifting用haloロード)へ書き換える。5/3可逆lifting自体の
+           数式・境界処理は変更せず、並列化・メモリアクセスパターンのみを最適化する。
+           DWT以外のステージは対象外(Nsightでボトルネックでないことを確認済み)。
+           詳細は計画ファイル(セクション11)のPhase 4c節を参照。
+
   [実装上の追加発見] 実際のパイプライン構造は上記の8段階のような独立ステージ
   分割ではなく、「Init(1スレッド) -> Dwt(CPU_PROFILE_CPU時のみ、component単位の
   別スレッドプール) -> Pack(DWT[LOW_LATENCY時はここでインライン計算]+GC+
@@ -332,6 +354,20 @@ Phaseが進むごとに「元のCリファレンス実装」と「CUDA実装」�
   (16ms理想目標はまだ未達)**。残るオーバーヘッドの内訳(CUDA Graph未導入による小カーネル
   起動オーバーヘッド、細かいH2D/D2H転送)はPhase4b-2で検証予定。
   bit-exact検証: `*Cuda*`テスト20/20 pass(`TestEncodeFrameCuda.cc`含め無回帰)。
+  回帰: 全12057件中12055件パス(既存2件スキップのみ、回帰ゼロ)。
+
+  Phase 4b-2実装後の実行結果(4K・10bit・3840x2160、同一条件で再計測、20回試行平均、
+  CUDA Graphキャプチャはウォームアップとして計測対象外、ホスト可視レイテンシ):
+    Encode(CUDA, full frame, CUDA Graph)        GPU  mean ~18.43ms (Phase4b-1の19.98msから改善)
+    Encode(CPU reference, full frame, single-threaded) CPU  mean ~23.55ms (再計測値)
+  → **33ms現実目標は達成継続、16ms理想目標(18.43ms)はまだ未達**。Nsight Systemsで
+  プロファイルした結果、DWTの素朴な1D liftingカーネル(1スレッド=1行または1列)が
+  GPUカーネル時間全体の約91.6%を占めることが判明。CUDA Graph化によりカーネル起動
+  オーバーヘッド・細かい転送コストはボトルネックでなくなり、残る唯一の主要因はDWT
+  カーネル自体の実行時間であることが確定した。16msへ向けた次の最有力候補はDWTの
+  タイル化・shared memory活用への書き換え(構造的に大きい変更のため未着手、推奨事項として
+  記録)。
+  bit-exact検証: `*Cuda*`テスト20/20 pass(Graph replay経路も含め無回帰)。
   回帰: 全12057件中12055件パス(既存2件スキップのみ、回帰ゼロ)。
 
 --------------------------------------------------

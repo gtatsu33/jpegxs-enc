@@ -92,7 +92,63 @@ typedef struct SvtCudaFrameContext {
     uint8_t* d_pack_out;
 
     /* --- Frame-constant packet inclusion geometry (pi->packets[]) --- */
-    void* d_packets; /* svt_cuda_pack_packet_t[packets_num], see PackCuda.cuh */
+    void* d_packets;  /* svt_cuda_pack_packet_t[packets_num], see PackCuda.cuh */
+    void* h_packets;  /* persistent host mirror (avoids a D2H download every encode call) */
+
+    /* =====================================================================
+     * Phase 4b-2: CUDA Graph support. Two graphs bracket the host-side RC
+     * binary search (which must stay off-graph -- see plan file Phase 4b-2):
+     *   graph1 = DWT+NLT (all components) + GC/significance (all bands) +
+     *            RC LUT build (all bands) + D2H copy of the LUT into h_lut.
+     *   graph2 = H2D upload of RC results + quantize (all bands) + pack
+     *            (all precincts) + D2H copy of the pack error flag.
+     * Both graphs are captured lazily on first use (or whenever a captured
+     * argument changes) and replayed via cudaGraphLaunch on every call after
+     * that. See EncodeFrameCuda.cu's svt_cuda_encode_frame() for the capture/
+     * replay logic and cap_* invalidation checks.
+     * ===================================================================== */
+    cudaGraph_t graph1;
+    cudaGraphExec_t graph1_exec;
+    uint8_t graph1_captured;
+    const void* cap_in_planes[FCC_MAX_COMPONENTS];
+    uint32_t cap_in_stride[FCC_MAX_COMPONENTS];
+    uint32_t cap_decom_h, cap_decom_v;
+    uint8_t cap_input_bit_depth, cap_hdr_Bw, cap_hdr_Fq, cap_coding_significance;
+
+    cudaGraph_t graph2;
+    cudaGraphExec_t graph2_exec;
+    uint8_t graph2_captured;
+    uint8_t cap_quant_type, cap_use_short_header;
+
+    /* --- Phase 4b-2: buffers that used to be cudaMalloc'd/freed on every
+     * svt_cuda_encode_frame() call, now persistent (also required for graph
+     * capture -- captured node arguments bake in fixed addresses). --- */
+    uint32_t* d_comp_stride; /* [FCC_MAX_COMPONENTS], uploaded once at creation (comp_width never changes) */
+
+    void* d_lut;              /* opaque RC LUT rows, lut_total_rows * lut_row_size_bytes (see create()) */
+    uint32_t lut_total_rows;  /* sum of h_bands[].height across all bands */
+    uint32_t* lut_row_offset; /* host [bands_num_all], row offset of band b within d_lut/h_lut */
+    void* h_lut;              /* pinned host mirror of d_lut (D2H target inside graph1) */
+
+    uint8_t* d_gtli_per_band; /* [bands_num_all * precincts_num], band-major (quantize kernel input) */
+    uint8_t* h_gtli_per_band; /* pinned host mirror, band-major (H2D source inside graph2) */
+
+    int* d_error;
+    int* h_error; /* pinned, D2H target inside graph2 */
+
+    /* --- Phase 4b-2: pinned host mirrors of the per-precinct RC outputs
+     * (filled by the host-side binary search between graph1 and graph2, then
+     * uploaded as fixed-address H2D copies captured inside graph2). --- */
+    uint8_t* h_gtli;        /* [precincts_num * bands_num_all], precinct-major (pack kernel input) */
+    uint8_t* h_pack_method; /* [precincts_num * bands_num_all], precinct-major */
+    uint32_t* h_psd;        /* [precincts_num * packets_num] */
+    uint32_t* h_psg;        /* [precincts_num * packets_num] */
+    uint32_t* h_pss;        /* [precincts_num * packets_num] */
+    uint8_t* h_quant;       /* [precincts_num] */
+    uint8_t* h_refine;      /* [precincts_num] */
+    uint32_t* h_total_bytes;    /* [precincts_num] */
+    uint32_t* h_padding_bytes;  /* [precincts_num] */
+    uint32_t* h_out_offset;     /* [precincts_num] */
 } SvtCudaFrameContext;
 
 /* Creates a persistent context sized exactly for the given, already-computed
@@ -104,9 +160,15 @@ typedef struct SvtCudaFrameContext {
  * caller-supplied flat array of bands_num_all entries in pi->global_band_info[] order.
  * Returns 0 on success, negative CUDA error code on failure.
  */
+/* lut_row_size_bytes: sizeof of the caller's per-(band,line) RC LUT row
+ * struct (opaque to this file -- see EncodeFrameCuda.cu's EfcBandLineLut).
+ * Used only to size d_lut/h_lut; this function does not interpret the LUT
+ * contents itself.
+ */
 int svt_cuda_frame_context_create(SvtCudaFrameContext* ctx, uint32_t comps_num, const uint32_t* comp_width,
                                   const uint32_t* comp_height, uint32_t bands_num_all, const SvtCudaFrameBandGeom* bands,
-                                  uint32_t precincts_num, uint32_t packets_num, uint32_t pack_out_capacity_bytes);
+                                  uint32_t precincts_num, uint32_t packets_num, uint32_t pack_out_capacity_bytes,
+                                  uint32_t lut_row_size_bytes);
 
 void svt_cuda_frame_context_destroy(SvtCudaFrameContext* ctx);
 

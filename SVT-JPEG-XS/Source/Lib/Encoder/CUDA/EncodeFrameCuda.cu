@@ -20,6 +20,17 @@
 #define EFC_PACKET_HEADER_SHORT_SIZE_BYTES 5
 #define EFC_CODING_MODE_FLAG_SIGNIFICANCE 2u
 
+/* RC LUT row (moved above section 1 so svt_cuda_frame_context_create_from_pi()
+ * can pass sizeof(EfcBandLineLut) to svt_cuda_frame_context_create(), which
+ * sizes ctx->d_lut/h_lut without needing to know this layout itself). */
+struct EfcBandLineLut {
+    uint32_t size_data_no_sign[EFC_TRUNCATION_MAX + 1];
+    uint32_t cum_count[EFC_TRUNCATION_MAX + 1];
+    uint32_t sig_cum[EFC_TRUNCATION_MAX + 1];
+    uint32_t leftover_max;
+    uint32_t leftover_extra;
+};
+
 /* =====================================================================
  * 1. Context construction from a real pi_t/pi_enc_t.
  * ===================================================================== */
@@ -67,7 +78,8 @@ int svt_cuda_frame_context_create_from_pi(SvtCudaFrameContext* ctx, const pi_t* 
     }
 
     int rc = svt_cuda_frame_context_create(ctx, pi->comps_num, comp_width, comp_height, pi->bands_num_all, bands.data(),
-                                           pi->precincts_line_num, pi->packets_num, pack_out_capacity_bytes);
+                                           pi->precincts_line_num, pi->packets_num, pack_out_capacity_bytes,
+                                           (uint32_t)sizeof(EfcBandLineLut));
     if (rc != 0) {
         return rc;
     }
@@ -87,6 +99,11 @@ int svt_cuda_frame_context_create_from_pi(SvtCudaFrameContext* ctx, const pi_t* 
         svt_cuda_frame_context_destroy(ctx);
         return -(int)err;
     }
+    /* Persistent host mirror: packets[] never changes for this context's
+     * geometry, so cache it once here instead of downloading it from the
+     * device on every svt_cuda_encode_frame() call. */
+    ctx->h_packets = malloc(pi->packets_num * sizeof(svt_cuda_pack_packet_t));
+    memcpy(ctx->h_packets, packets.data(), pi->packets_num * sizeof(svt_cuda_pack_packet_t));
     return 0;
 }
 
@@ -170,14 +187,6 @@ __global__ void k_sig_band_frame(const uint8_t* gcli, uint32_t gcli_width, uint3
 /* =====================================================================
  * 4. Batched RC LUT build (one launch per band, whole frame height at once).
  * ===================================================================== */
-
-struct EfcBandLineLut {
-    uint32_t size_data_no_sign[EFC_TRUNCATION_MAX + 1];
-    uint32_t cum_count[EFC_TRUNCATION_MAX + 1];
-    uint32_t sig_cum[EFC_TRUNCATION_MAX + 1];
-    uint32_t leftover_max;
-    uint32_t leftover_extra;
-};
 
 __global__ void k_rc_build_lut_band_frame(const uint8_t* gcli, const uint8_t* sig, uint32_t gcli_width, uint32_t sig_width,
                                           uint32_t height, uint8_t coding_significance, EfcBandLineLut* out_lut) {
@@ -331,9 +340,9 @@ static int efc_compute_all_truncation(uint32_t bands_num, const SvtCudaFrameBand
 
 /* Computes total precinct data-budget bytes for the given gtli[], using each
  * band's LUT slice for THIS precinct's rows (row_base..row_base+lines). */
-static uint32_t efc_compute_budget_bytes(uint32_t bands_num, const SvtCudaFrameBandGeom* bands,
-                                         const std::vector<EfcBandLineLut>& lut, const std::vector<uint32_t>& lut_row_offset,
-                                         uint32_t precinct_idx, const uint8_t* gtli, uint8_t coding_significance,
+static uint32_t efc_compute_budget_bytes(uint32_t bands_num, const SvtCudaFrameBandGeom* bands, const EfcBandLineLut* lut,
+                                         const uint32_t* lut_row_offset, uint32_t precinct_idx, const uint8_t* gtli,
+                                         uint8_t coding_significance,
                                          uint32_t packets_num, const svt_cuda_pack_packet_t* packets,
                                          std::vector<uint32_t>& pack_gcli_bits, std::vector<uint32_t>& pack_sig_bits,
                                          std::vector<uint32_t>& pack_data_bits, std::vector<uint8_t>* pack_method_out) {
@@ -755,7 +764,39 @@ __global__ void k_pack_precinct_frame(const SvtCudaFrameBandGeom* bands, uint32_
 
 /* =====================================================================
  * 8. Top-level orchestration.
+ *
+ * Phase 4b-2: the GPU-only launch sequences are captured once as two
+ * cudaGraphs and replayed via cudaGraphLaunch() on every call after that
+ * (see FrameContextCuda.cuh's graph1/graph2 fields for the exact boundary
+ * rationale). Recapture only happens when a value baked into a captured
+ * node's arguments actually changes (input pointers/strides/decom for
+ * graph1, quant_type/use_short_header for graph2) -- in the realistic
+ * "repeated frames of the same resolution" scenario this is a one-time
+ * cost on the first call.
  * ===================================================================== */
+
+static int efc_graph1_needs_recapture(const SvtCudaFrameContext* ctx, const void* const in_planes[],
+                                      const uint32_t in_stride[], uint32_t decom_h, uint32_t decom_v,
+                                      uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq, uint8_t coding_significance) {
+    if (!ctx->graph1_captured)
+        return 1;
+    if (ctx->cap_decom_h != decom_h || ctx->cap_decom_v != decom_v || ctx->cap_input_bit_depth != input_bit_depth ||
+        ctx->cap_hdr_Bw != hdr_Bw || ctx->cap_hdr_Fq != hdr_Fq || ctx->cap_coding_significance != coding_significance) {
+        return 1;
+    }
+    for (uint32_t c = 0; c < ctx->comps_num; c++) {
+        if (ctx->cap_in_planes[c] != in_planes[c] || ctx->cap_in_stride[c] != in_stride[c]) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int efc_graph2_needs_recapture(const SvtCudaFrameContext* ctx, uint8_t quant_type, uint8_t use_short_header) {
+    if (!ctx->graph2_captured)
+        return 1;
+    return ctx->cap_quant_type != quant_type || ctx->cap_use_short_header != use_short_header;
+}
 
 int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[], const uint32_t in_stride[],
                           uint32_t decom_h, uint32_t decom_v, uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq,
@@ -767,88 +808,115 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
     uint32_t packets_num = ctx->packets_num;
     cudaError_t cerr = cudaSuccess;
 
-    /* --- Step 1: NLT + DWT per component --- */
-    for (uint32_t c = 0; c < ctx->comps_num; c++) {
-        int err = efc_run_dwt(ctx, c, in_planes[c], in_stride[c], decom_h, decom_v, input_bit_depth, hdr_Bw, hdr_Fq);
-        if (err != 0) {
-            return err;
+    /* --- Graph 1: NLT+DWT (all components) + batched GC/significance (all
+     * bands) + batched RC LUT build (all bands) + D2H copy of the LUT into
+     * ctx->h_lut. Captured once, replayed on every call after that. --- */
+    if (efc_graph1_needs_recapture(ctx, in_planes, in_stride, decom_h, decom_v, input_bit_depth, hdr_Bw, hdr_Fq,
+                                   coding_significance)) {
+        if (ctx->graph1_exec) {
+            cudaGraphExecDestroy(ctx->graph1_exec);
+            ctx->graph1_exec = NULL;
+        }
+        if (ctx->graph1) {
+            cudaGraphDestroy(ctx->graph1);
+            ctx->graph1 = NULL;
+        }
+
+        if ((cerr = cudaStreamBeginCapture(ctx->stream, cudaStreamCaptureModeThreadLocal)) != cudaSuccess) {
+            return -(int)cerr;
+        }
+
+        int dwt_err = 0;
+        for (uint32_t c = 0; c < ctx->comps_num; c++) {
+            dwt_err = efc_run_dwt(ctx, c, in_planes[c], in_stride[c], decom_h, decom_v, input_bit_depth, hdr_Bw, hdr_Fq);
+            if (dwt_err != 0) {
+                break;
+            }
+        }
+
+        if (dwt_err == 0) {
+            for (uint32_t b = 0; b < bands_num_all; b++) {
+                const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
+                if (g.band_id == BAND_NOT_EXIST || g.height == 0)
+                    continue;
+                uint32_t total_gc = g.height * g.gcli_width;
+                uint32_t threads = 256, blocks = (total_gc + threads - 1) / threads;
+                k_gc_band_frame<<<blocks, threads, 0, ctx->stream>>>(ctx->d_pyramid16[g.comp_id], ctx->comp_width[g.comp_id],
+                                                                      g.x, g.y, g.width, g.height, g.gcli_width,
+                                                                      ctx->d_gcli_frame + g.gcli_offset);
+                uint32_t total_sig = g.height * g.significance_width;
+                blocks = (total_sig + threads - 1) / threads;
+                k_sig_band_frame<<<blocks, threads, 0, ctx->stream>>>(ctx->d_gcli_frame + g.gcli_offset, g.gcli_width, g.height,
+                                                                       g.significance_width, ctx->d_sig_frame + g.sig_offset);
+            }
+
+            for (uint32_t b = 0; b < bands_num_all; b++) {
+                const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
+                if (g.band_id == BAND_NOT_EXIST || g.height == 0)
+                    continue;
+                uint32_t threads = 256, blocks = (g.height + threads - 1) / threads;
+                k_rc_build_lut_band_frame<<<blocks, threads, 0, ctx->stream>>>(
+                    ctx->d_gcli_frame + g.gcli_offset, ctx->d_sig_frame + g.sig_offset, g.gcli_width, g.significance_width,
+                    g.height, coding_significance, (EfcBandLineLut*)ctx->d_lut + ctx->lut_row_offset[b]);
+            }
+
+            if (ctx->lut_total_rows) {
+                cerr = cudaMemcpyAsync(ctx->h_lut, ctx->d_lut, (size_t)ctx->lut_total_rows * sizeof(EfcBandLineLut),
+                                       cudaMemcpyDeviceToHost, ctx->stream);
+            }
+        }
+
+        cudaGraph_t g1 = NULL;
+        cudaError_t capend = cudaStreamEndCapture(ctx->stream, &g1);
+        if (dwt_err != 0) {
+            if (g1) {
+                cudaGraphDestroy(g1);
+            }
+            return dwt_err;
+        }
+        if (capend != cudaSuccess || cerr != cudaSuccess) {
+            if (g1) {
+                cudaGraphDestroy(g1);
+            }
+            return capend != cudaSuccess ? -(int)capend : -(int)cerr;
+        }
+        if ((cerr = cudaGraphInstantiate(&ctx->graph1_exec, g1, 0)) != cudaSuccess) {
+            cudaGraphDestroy(g1);
+            return -(int)cerr;
+        }
+        ctx->graph1 = g1;
+        ctx->graph1_captured = 1;
+        ctx->cap_decom_h = decom_h;
+        ctx->cap_decom_v = decom_v;
+        ctx->cap_input_bit_depth = input_bit_depth;
+        ctx->cap_hdr_Bw = hdr_Bw;
+        ctx->cap_hdr_Fq = hdr_Fq;
+        ctx->cap_coding_significance = coding_significance;
+        for (uint32_t c = 0; c < ctx->comps_num; c++) {
+            ctx->cap_in_planes[c] = in_planes[c];
+            ctx->cap_in_stride[c] = in_stride[c];
         }
     }
 
-    /* --- Step 2: batched GC + significance, one launch per band, whole frame height --- */
-    for (uint32_t b = 0; b < bands_num_all; b++) {
-        const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
-        if (g.band_id == BAND_NOT_EXIST || g.height == 0)
-            continue;
-        uint32_t total_gc = g.height * g.gcli_width;
-        uint32_t threads = 256, blocks = (total_gc + threads - 1) / threads;
-        k_gc_band_frame<<<blocks, threads, 0, ctx->stream>>>(ctx->d_pyramid16[g.comp_id], ctx->comp_width[g.comp_id], g.x, g.y,
-                                                              g.width, g.height, g.gcli_width, ctx->d_gcli_frame + g.gcli_offset);
-        uint32_t total_sig = g.height * g.significance_width;
-        blocks = (total_sig + threads - 1) / threads;
-        k_sig_band_frame<<<blocks, threads, 0, ctx->stream>>>(
-            ctx->d_gcli_frame + g.gcli_offset, g.gcli_width, g.height, g.significance_width, ctx->d_sig_frame + g.sig_offset);
+    if ((cerr = cudaGraphLaunch(ctx->graph1_exec, ctx->stream)) == cudaSuccess) {
+        cerr = cudaStreamSynchronize(ctx->stream); /* ctx->h_lut must be ready before the host RC loop reads it */
     }
-
-    /* --- Step 3: batched RC LUT build, one launch per band, whole frame height --- */
-    std::vector<uint32_t> lut_row_offset(bands_num_all, 0);
-    uint32_t lut_total_rows = 0;
-    for (uint32_t b = 0; b < bands_num_all; b++) {
-        lut_row_offset[b] = lut_total_rows;
-        if (ctx->h_bands[b].band_id != BAND_NOT_EXIST) {
-            lut_total_rows += ctx->h_bands[b].height;
-        }
-    }
-    EfcBandLineLut* d_lut = NULL;
-    if ((cerr = cudaMalloc(&d_lut, (lut_total_rows ? lut_total_rows : 1) * sizeof(EfcBandLineLut))) != cudaSuccess) {
-        return -(int)cerr;
-    }
-    for (uint32_t b = 0; b < bands_num_all; b++) {
-        const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
-        if (g.band_id == BAND_NOT_EXIST || g.height == 0)
-            continue;
-        uint32_t threads = 256, blocks = (g.height + threads - 1) / threads;
-        k_rc_build_lut_band_frame<<<blocks, threads, 0, ctx->stream>>>(ctx->d_gcli_frame + g.gcli_offset,
-                                                                       ctx->d_sig_frame + g.sig_offset, g.gcli_width,
-                                                                       g.significance_width, g.height, coding_significance,
-                                                                       d_lut + lut_row_offset[b]);
-    }
-    std::vector<EfcBandLineLut> lut(lut_total_rows);
-    if (lut_total_rows) {
-        cerr = cudaMemcpyAsync(
-            lut.data(), d_lut, lut_total_rows * sizeof(EfcBandLineLut), cudaMemcpyDeviceToHost, ctx->stream);
-    }
-    if (cerr == cudaSuccess) {
-        cerr = cudaStreamSynchronize(ctx->stream);
-    }
-    cudaFree(d_lut);
     if (cerr != cudaSuccess) {
         return -(int)cerr;
     }
 
     /* --- Step 4: host-side per-precinct binary search (RC), sequential across
      * precincts but each precinct only does cheap LUT lookups -- the expensive
-     * histogram build already ran batched on GPU in step 3. --- */
+     * histogram build already ran batched on GPU in graph1. Reads/writes
+     * ctx's persistent pinned buffers directly (fixed addresses, required
+     * since they are also H2D sources captured inside graph2 below). --- */
     uint32_t pack_header_bits =
         use_short_header ? (EFC_PACKET_HEADER_SHORT_SIZE_BYTES * 8) : (EFC_PACKET_HEADER_LONG_SIZE_BYTES * 8);
     uint32_t headers_bytes = efc_bits_to_bytes(efc_align8(EFC_PRECINCT_HEADER_SIZE_BYTES * 8 + bands_num_exists * 2)) +
         efc_bits_to_bytes(efc_align8(pack_header_bits * packets_exist_num));
 
-    std::vector<uint8_t> h_gtli((size_t)precincts_num * bands_num_all);
-    std::vector<uint8_t> h_pack_method((size_t)precincts_num * bands_num_all, 0);
-    std::vector<uint32_t> h_psd((size_t)precincts_num * packets_num);
-    std::vector<uint32_t> h_psg((size_t)precincts_num * packets_num);
-    std::vector<uint32_t> h_pss((size_t)precincts_num * packets_num);
-    std::vector<uint8_t> h_quant(precincts_num), h_refine(precincts_num);
-    std::vector<uint32_t> h_total_bytes(precincts_num), h_padding_bytes(precincts_num), h_out_offset(precincts_num);
-
-    std::vector<svt_cuda_pack_packet_t> h_packets(packets_num);
-    /* d_packets was built once at context-creation time; also keep a host
-     * mirror here purely for the CPU-side aggregation loop. */
-    cerr = cudaMemcpy(h_packets.data(), ctx->d_packets, packets_num * sizeof(svt_cuda_pack_packet_t), cudaMemcpyDeviceToHost);
-    if (cerr != cudaSuccess) {
-        return -(int)cerr;
-    }
+    const EfcBandLineLut* lut = (const EfcBandLineLut*)ctx->h_lut;
+    const svt_cuda_pack_packet_t* h_packets = (const svt_cuda_pack_packet_t*)ctx->h_packets;
 
     std::vector<uint8_t> gtli(bands_num_all);
     std::vector<uint32_t> pgb(bands_num_all * 4), psb(bands_num_all * 4), pdb(bands_num_all * 4);
@@ -883,8 +951,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
                 step = EFC_STEP_OUT_OF_RANGE;
                 continue;
             }
-            uint32_t total = efc_compute_budget_bytes(bands_num_all, ctx->h_bands, lut, lut_row_offset, pr, gtli.data(),
-                                                      coding_significance, packets_num, h_packets.data(), pgb, psb, pdb, NULL);
+            uint32_t total = efc_compute_budget_bytes(bands_num_all, ctx->h_bands, lut, ctx->lut_row_offset, pr, gtli.data(),
+                                                      coding_significance, packets_num, h_packets, pgb, psb, pdb, NULL);
             step = (total > budget_to_data_bytes) ? EFC_STEP_TOO_SMALL : EFC_STEP_TOO_BIG;
         }
         if (!found_q) {
@@ -914,8 +982,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
                 step = EFC_STEP_OUT_OF_RANGE;
                 continue;
             }
-            uint32_t total = efc_compute_budget_bytes(bands_num_all, ctx->h_bands, lut, lut_row_offset, pr, gtli.data(),
-                                                      coding_significance, packets_num, h_packets.data(), pgb, psb, pdb, NULL);
+            uint32_t total = efc_compute_budget_bytes(bands_num_all, ctx->h_bands, lut, ctx->lut_row_offset, pr, gtli.data(),
+                                                      coding_significance, packets_num, h_packets, pgb, psb, pdb, NULL);
             step = (total <= budget_to_data_bytes) ? EFC_STEP_TOO_SMALL : EFC_STEP_TOO_BIG;
         }
         if (!found_r) {
@@ -924,16 +992,18 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
 
         std::vector<uint8_t> pack_method(bands_num_all, 0);
         efc_compute_all_truncation(bands_num_all, ctx->h_bands, quantization, refinement, gtli.data());
-        uint32_t data_bytes = efc_compute_budget_bytes(bands_num_all, ctx->h_bands, lut, lut_row_offset, pr, gtli.data(),
-                                                       coding_significance, packets_num, h_packets.data(), pgb, psb, pdb,
-                                                       &pack_method);
+        uint32_t data_bytes = efc_compute_budget_bytes(bands_num_all, ctx->h_bands, lut, ctx->lut_row_offset, pr, gtli.data(),
+                                                       coding_significance, packets_num, h_packets, pgb, psb, pdb, &pack_method);
 
-        memcpy(&h_gtli[(size_t)pr * bands_num_all], gtli.data(), bands_num_all);
-        memcpy(&h_pack_method[(size_t)pr * bands_num_all], pack_method.data(), bands_num_all);
-        h_quant[pr] = (uint8_t)quantization;
-        h_refine[pr] = (uint8_t)refinement;
-        h_total_bytes[pr] = budget_bytes;
-        h_padding_bytes[pr] = budget_to_data_bytes - data_bytes;
+        memcpy(&ctx->h_gtli[(size_t)pr * bands_num_all], gtli.data(), bands_num_all);
+        memcpy(&ctx->h_pack_method[(size_t)pr * bands_num_all], pack_method.data(), bands_num_all);
+        for (uint32_t b = 0; b < bands_num_all; b++) {
+            ctx->h_gtli_per_band[(size_t)b * precincts_num + pr] = gtli[b];
+        }
+        ctx->h_quant[pr] = (uint8_t)quantization;
+        ctx->h_refine[pr] = (uint8_t)refinement;
+        ctx->h_total_bytes[pr] = budget_bytes;
+        ctx->h_padding_bytes[pr] = budget_to_data_bytes - data_bytes;
 
         /* Per-packet byte sizes for THIS precinct, matches precinct_get_budget_bytes(). */
         for (uint32_t p = 0; p < packets_num; p++) {
@@ -948,132 +1018,125 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
                     sig_bits += psb[(size_t)bidx * 4 + line];
                 }
             }
-            h_psd[(size_t)pr * packets_num + p] = efc_bits_to_bytes(data_bits);
-            h_psg[(size_t)pr * packets_num + p] = efc_bits_to_bytes(gcli_bits);
-            h_pss[(size_t)pr * packets_num + p] = efc_bits_to_bytes(sig_bits);
+            ctx->h_psd[(size_t)pr * packets_num + p] = efc_bits_to_bytes(data_bits);
+            ctx->h_psg[(size_t)pr * packets_num + p] = efc_bits_to_bytes(gcli_bits);
+            ctx->h_pss[(size_t)pr * packets_num + p] = efc_bits_to_bytes(sig_bits);
         }
     }
 
     uint32_t running = 0;
     for (uint32_t pr = 0; pr < precincts_num; pr++) {
-        h_out_offset[pr] = running;
-        running += h_total_bytes[pr];
+        ctx->h_out_offset[pr] = running;
+        running += ctx->h_total_bytes[pr];
     }
     if (running > ctx->pack_out_capacity_bytes) {
         return 1;
     }
 
-    /* --- Step 5: upload RC results, quantize (batched per band), pack (batched per precinct) --- */
-    cerr = cudaMemcpyAsync(ctx->d_gtli, h_gtli.data(), h_gtli.size(), cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr == cudaSuccess)
-        cerr = cudaMemcpyAsync(ctx->d_pack_method, h_pack_method.data(), h_pack_method.size(), cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr == cudaSuccess)
-        cerr = cudaMemcpyAsync(
-            ctx->d_packet_size_data_bytes, h_psd.data(), h_psd.size() * sizeof(uint32_t), cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr == cudaSuccess)
-        cerr = cudaMemcpyAsync(
-            ctx->d_packet_size_gcli_bytes, h_psg.data(), h_psg.size() * sizeof(uint32_t), cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr == cudaSuccess)
-        cerr = cudaMemcpyAsync(ctx->d_packet_size_significance_bytes, h_pss.data(), h_pss.size() * sizeof(uint32_t),
-                               cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr == cudaSuccess)
-        cerr = cudaMemcpyAsync(ctx->d_precinct_quantization, h_quant.data(), h_quant.size(), cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr == cudaSuccess)
-        cerr =
-            cudaMemcpyAsync(ctx->d_precinct_refinement, h_refine.data(), h_refine.size(), cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr == cudaSuccess)
-        cerr = cudaMemcpyAsync(ctx->d_precinct_total_bytes, h_total_bytes.data(), h_total_bytes.size() * sizeof(uint32_t),
-                               cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr == cudaSuccess)
-        cerr = cudaMemcpyAsync(ctx->d_precinct_padding_bytes, h_padding_bytes.data(), h_padding_bytes.size() * sizeof(uint32_t),
-                               cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr == cudaSuccess)
-        cerr = cudaMemcpyAsync(ctx->d_precinct_out_offset, h_out_offset.data(), h_out_offset.size() * sizeof(uint32_t),
-                               cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr != cudaSuccess) {
-        return -(int)cerr;
-    }
-
-    uint32_t comp_stride_h[FCC_MAX_COMPONENTS] = {
-        ctx->comp_width[0], ctx->comp_width[1], ctx->comp_width[2], ctx->comp_width[3]};
-    uint32_t* d_comp_stride = NULL;
-    if ((cerr = cudaMalloc(&d_comp_stride, sizeof(comp_stride_h))) != cudaSuccess) {
-        return -(int)cerr;
-    }
-    cerr = cudaMemcpyAsync(d_comp_stride, comp_stride_h, sizeof(comp_stride_h), cudaMemcpyHostToDevice, ctx->stream);
-    if (cerr != cudaSuccess) {
-        cudaFree(d_comp_stride);
-        return -(int)cerr;
-    }
-
-    /* Gather per-band contiguous gtli[precincts_num] slices (strided source,
-     * cheap: bands_num_all * precincts_num bytes total) before the
-     * quantize kernels, which expect contiguous per-band arrays. */
-    std::vector<uint8_t> h_gtli_per_band(precincts_num);
-    uint8_t* d_gtli_per_band = NULL;
-    if ((cerr = cudaMalloc(&d_gtli_per_band, precincts_num * bands_num_all)) != cudaSuccess) {
-        cudaFree(d_comp_stride);
-        return -(int)cerr;
-    }
-    for (uint32_t b = 0; b < bands_num_all; b++) {
-        for (uint32_t pr = 0; pr < precincts_num; pr++) {
-            h_gtli_per_band[pr] = h_gtli[(size_t)pr * bands_num_all + b];
+    /* --- Graph 2: H2D upload of RC results, batched quantize (all bands),
+     * batched pack (all precincts), D2H copy of the pack error flag.
+     * Captured once, replayed on every call after that. --- */
+    if (efc_graph2_needs_recapture(ctx, quant_type, use_short_header)) {
+        if (ctx->graph2_exec) {
+            cudaGraphExecDestroy(ctx->graph2_exec);
+            ctx->graph2_exec = NULL;
         }
-        cerr = cudaMemcpyAsync(d_gtli_per_band + (size_t)b * precincts_num, h_gtli_per_band.data(), precincts_num,
-                               cudaMemcpyHostToDevice, ctx->stream);
-        if (cerr != cudaSuccess)
-            break;
-    }
-    if (cerr != cudaSuccess) {
-        cudaFree(d_comp_stride);
-        cudaFree(d_gtli_per_band);
-        return -(int)cerr;
+        if (ctx->graph2) {
+            cudaGraphDestroy(ctx->graph2);
+            ctx->graph2 = NULL;
+        }
+
+        if ((cerr = cudaStreamBeginCapture(ctx->stream, cudaStreamCaptureModeThreadLocal)) != cudaSuccess) {
+            return -(int)cerr;
+        }
+
+        size_t pb_bytes = (size_t)precincts_num * bands_num_all;
+        size_t pp_elems = (size_t)precincts_num * packets_num;
+        cerr = cudaMemcpyAsync(ctx->d_gtli, ctx->h_gtli, pb_bytes, cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(ctx->d_pack_method, ctx->h_pack_method, pb_bytes, cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(
+                ctx->d_packet_size_data_bytes, ctx->h_psd, pp_elems * sizeof(uint32_t), cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(
+                ctx->d_packet_size_gcli_bytes, ctx->h_psg, pp_elems * sizeof(uint32_t), cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(ctx->d_packet_size_significance_bytes, ctx->h_pss, pp_elems * sizeof(uint32_t),
+                                   cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(ctx->d_precinct_quantization, ctx->h_quant, precincts_num, cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(ctx->d_precinct_refinement, ctx->h_refine, precincts_num, cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(ctx->d_precinct_total_bytes, ctx->h_total_bytes, precincts_num * sizeof(uint32_t),
+                                   cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(ctx->d_precinct_padding_bytes, ctx->h_padding_bytes, precincts_num * sizeof(uint32_t),
+                                   cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(ctx->d_precinct_out_offset, ctx->h_out_offset, precincts_num * sizeof(uint32_t),
+                                   cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(ctx->d_gtli_per_band, ctx->h_gtli_per_band, pb_bytes, cudaMemcpyHostToDevice, ctx->stream);
+
+        if (cerr == cudaSuccess) {
+            for (uint32_t b = 0; b < bands_num_all; b++) {
+                const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
+                if (g.band_id == BAND_NOT_EXIST || g.height == 0)
+                    continue;
+                uint32_t threads = 256, blocks = (g.height + threads - 1) / threads;
+                k_quantize_band_frame<<<blocks, threads, 0, ctx->stream>>>(
+                    ctx->d_pyramid16[g.comp_id], ctx->comp_width[g.comp_id], g.x, g.y, g.width, g.height, g.gcli_width,
+                    ctx->d_gcli_frame + g.gcli_offset, g.height_lines_num, ctx->d_gtli_per_band + (size_t)b * precincts_num,
+                    quant_type);
+            }
+
+            cerr = cudaMemsetAsync(ctx->d_error, 0, sizeof(int), ctx->stream);
+        }
+
+        if (cerr == cudaSuccess) {
+            k_pack_precinct_frame<<<precincts_num, 1, 0, ctx->stream>>>(
+                ctx->d_bands, bands_num_all, bands_num_exists, ctx->d_pyramid_ptrs, ctx->d_comp_stride, ctx->d_gcli_frame,
+                ctx->d_sig_frame, ctx->d_gtli, ctx->d_pack_method, packets_num, (const svt_cuda_pack_packet_t*)ctx->d_packets,
+                use_short_header, ctx->d_precinct_quantization, ctx->d_precinct_refinement, ctx->d_precinct_total_bytes,
+                ctx->d_precinct_padding_bytes, ctx->d_precinct_out_offset, ctx->d_packet_size_data_bytes,
+                ctx->d_packet_size_gcli_bytes, ctx->d_packet_size_significance_bytes, ctx->d_pack_out, ctx->d_error);
+
+            cerr = cudaMemcpyAsync(ctx->h_error, ctx->d_error, sizeof(int), cudaMemcpyDeviceToHost, ctx->stream);
+        }
+
+        cudaGraph_t g2 = NULL;
+        cudaError_t capend2 = cudaStreamEndCapture(ctx->stream, &g2);
+        if (capend2 != cudaSuccess || cerr != cudaSuccess) {
+            if (g2) {
+                cudaGraphDestroy(g2);
+            }
+            return capend2 != cudaSuccess ? -(int)capend2 : -(int)cerr;
+        }
+        if ((cerr = cudaGraphInstantiate(&ctx->graph2_exec, g2, 0)) != cudaSuccess) {
+            cudaGraphDestroy(g2);
+            return -(int)cerr;
+        }
+        ctx->graph2 = g2;
+        ctx->graph2_captured = 1;
+        ctx->cap_quant_type = quant_type;
+        ctx->cap_use_short_header = use_short_header;
     }
 
-    for (uint32_t b = 0; b < bands_num_all; b++) {
-        const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
-        if (g.band_id == BAND_NOT_EXIST || g.height == 0)
-            continue;
-        uint32_t threads = 256, blocks = (g.height + threads - 1) / threads;
-        k_quantize_band_frame<<<blocks, threads, 0, ctx->stream>>>(ctx->d_pyramid16[g.comp_id], ctx->comp_width[g.comp_id], g.x,
-                                                                    g.y, g.width, g.height, g.gcli_width,
-                                                                    ctx->d_gcli_frame + g.gcli_offset, g.height_lines_num,
-                                                                    d_gtli_per_band + (size_t)b * precincts_num, quant_type);
-    }
-
-    int* d_error = NULL;
-    if ((cerr = cudaMalloc(&d_error, sizeof(int))) == cudaSuccess) {
-        cerr = cudaMemsetAsync(d_error, 0, sizeof(int), ctx->stream);
-    }
-    if (cerr != cudaSuccess) {
-        cudaFree(d_comp_stride);
-        cudaFree(d_gtli_per_band);
-        cudaFree(d_error);
-        return -(int)cerr;
-    }
-
-    k_pack_precinct_frame<<<precincts_num, 1, 0, ctx->stream>>>(
-        ctx->d_bands, bands_num_all, bands_num_exists, ctx->d_pyramid_ptrs, d_comp_stride, ctx->d_gcli_frame, ctx->d_sig_frame,
-        ctx->d_gtli, ctx->d_pack_method, packets_num, (const svt_cuda_pack_packet_t*)ctx->d_packets, use_short_header,
-        ctx->d_precinct_quantization, ctx->d_precinct_refinement, ctx->d_precinct_total_bytes, ctx->d_precinct_padding_bytes,
-        ctx->d_precinct_out_offset, ctx->d_packet_size_data_bytes, ctx->d_packet_size_gcli_bytes,
-        ctx->d_packet_size_significance_bytes, ctx->d_pack_out, d_error);
-
-    int h_error = 0;
-    cerr = cudaMemcpyAsync(&h_error, d_error, sizeof(int), cudaMemcpyDeviceToHost, ctx->stream);
-    if (cerr == cudaSuccess)
+    if ((cerr = cudaGraphLaunch(ctx->graph2_exec, ctx->stream)) == cudaSuccess) {
+        /* Final bitstream size varies with frame content, so this D2H copy
+         * (unlike everything above) is not captured -- its destination is
+         * also caller-supplied and may differ across calls. */
         cerr = cudaMemcpyAsync(out_buffer, ctx->d_pack_out, running, cudaMemcpyDeviceToHost, ctx->stream);
-    if (cerr == cudaSuccess)
+    }
+    if (cerr == cudaSuccess) {
         cerr = cudaStreamSynchronize(ctx->stream);
-
-    cudaFree(d_comp_stride);
-    cudaFree(d_gtli_per_band);
-    cudaFree(d_error);
-
+    }
     if (cerr != cudaSuccess) {
         return -(int)cerr;
     }
-    if (h_error != 0) {
+    if (*ctx->h_error != 0) {
         return 1;
     }
     *out_used_bytes = running;

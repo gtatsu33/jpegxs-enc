@@ -9,6 +9,19 @@
 #include "FrameContextCuda.cuh"
 
 static void fcc_free_all(SvtCudaFrameContext* ctx) {
+    if (ctx->graph1_exec) {
+        cudaGraphExecDestroy(ctx->graph1_exec);
+    }
+    if (ctx->graph1) {
+        cudaGraphDestroy(ctx->graph1);
+    }
+    if (ctx->graph2_exec) {
+        cudaGraphExecDestroy(ctx->graph2_exec);
+    }
+    if (ctx->graph2) {
+        cudaGraphDestroy(ctx->graph2);
+    }
+
     cudaFree(ctx->d_in_raw);
     cudaFree(ctx->d_cur);
     cudaFree(ctx->d_other);
@@ -33,7 +46,28 @@ static void fcc_free_all(SvtCudaFrameContext* ctx) {
     cudaFree(ctx->d_precinct_padding_bytes);
     cudaFree(ctx->d_pack_out);
     cudaFree(ctx->d_packets);
+    free(ctx->h_packets);
     free(ctx->h_bands);
+
+    cudaFree(ctx->d_comp_stride);
+    cudaFree(ctx->d_lut);
+    free(ctx->lut_row_offset);
+    cudaFreeHost(ctx->h_lut);
+    cudaFree(ctx->d_gtli_per_band);
+    cudaFreeHost(ctx->h_gtli_per_band);
+    cudaFree(ctx->d_error);
+    cudaFreeHost(ctx->h_error);
+    cudaFreeHost(ctx->h_gtli);
+    cudaFreeHost(ctx->h_pack_method);
+    cudaFreeHost(ctx->h_psd);
+    cudaFreeHost(ctx->h_psg);
+    cudaFreeHost(ctx->h_pss);
+    cudaFreeHost(ctx->h_quant);
+    cudaFreeHost(ctx->h_refine);
+    cudaFreeHost(ctx->h_total_bytes);
+    cudaFreeHost(ctx->h_padding_bytes);
+    cudaFreeHost(ctx->h_out_offset);
+
     if (ctx->stream) {
         cudaStreamDestroy(ctx->stream);
     }
@@ -41,7 +75,8 @@ static void fcc_free_all(SvtCudaFrameContext* ctx) {
 
 int svt_cuda_frame_context_create(SvtCudaFrameContext* ctx, uint32_t comps_num, const uint32_t* comp_width,
                                   const uint32_t* comp_height, uint32_t bands_num_all, const SvtCudaFrameBandGeom* bands,
-                                  uint32_t precincts_num, uint32_t packets_num, uint32_t pack_out_capacity_bytes) {
+                                  uint32_t precincts_num, uint32_t packets_num, uint32_t pack_out_capacity_bytes,
+                                  uint32_t lut_row_size_bytes) {
     memset(ctx, 0, sizeof(*ctx));
     ctx->comps_num = comps_num;
     ctx->bands_num_all = bands_num_all;
@@ -63,14 +98,19 @@ int svt_cuda_frame_context_create(SvtCudaFrameContext* ctx, uint32_t comps_num, 
      * the true total, not an upper-bound guess). */
     std::vector<SvtCudaFrameBandGeom> hb(bands, bands + bands_num_all);
     uint32_t gcli_off = 0, sig_off = 0;
+    ctx->lut_row_offset = (uint32_t*)malloc((bands_num_all ? bands_num_all : 1) * sizeof(uint32_t));
+    uint32_t lut_total_rows = 0;
     for (uint32_t b = 0; b < bands_num_all; b++) {
         hb[b].gcli_offset = gcli_off;
         hb[b].sig_offset = sig_off;
         gcli_off += hb[b].height * hb[b].gcli_width;
         sig_off += hb[b].height * hb[b].significance_width;
+        ctx->lut_row_offset[b] = lut_total_rows;
+        lut_total_rows += hb[b].height; /* 0 for BAND_NOT_EXIST entries, per svt_cuda_frame_context_create_from_pi() */
     }
     ctx->gcli_frame_total = gcli_off;
     ctx->sig_frame_total = sig_off;
+    ctx->lut_total_rows = lut_total_rows;
 
     ctx->h_bands = (SvtCudaFrameBandGeom*)malloc(bands_num_all * sizeof(SvtCudaFrameBandGeom));
     memcpy(ctx->h_bands, hb.data(), bands_num_all * sizeof(SvtCudaFrameBandGeom));
@@ -146,6 +186,64 @@ int svt_cuda_frame_context_create(SvtCudaFrameContext* ctx, uint32_t comps_num, 
             break;
 
         if ((err = cudaMalloc(&ctx->d_pack_out, pack_out_capacity_bytes ? pack_out_capacity_bytes : 1)) != cudaSuccess)
+            break;
+
+        /* --- Phase 4b-2: persistent scratch + pinned host mirrors, replacing
+         * what used to be cudaMalloc'd/freed (and, for the LUT/gtli-per-band
+         * gather, downloaded/uploaded piecemeal) on every encode call. Pinned
+         * (page-locked) host memory is required here, not just an optimization:
+         * these addresses are baked into cudaGraph nodes at capture time and
+         * must stay valid/stable across every later cudaGraphLaunch replay. */
+        if ((err = cudaMalloc(&ctx->d_comp_stride, FCC_MAX_COMPONENTS * sizeof(uint32_t))) != cudaSuccess)
+            break;
+        {
+            uint32_t stride_h[FCC_MAX_COMPONENTS] = {0, 0, 0, 0};
+            for (uint32_t c = 0; c < comps_num; c++) {
+                stride_h[c] = comp_width[c];
+            }
+            if ((err = cudaMemcpy(ctx->d_comp_stride, stride_h, sizeof(stride_h), cudaMemcpyHostToDevice)) != cudaSuccess)
+                break;
+        }
+
+        size_t lut_bytes = (size_t)(lut_total_rows ? lut_total_rows : 1) * lut_row_size_bytes;
+        if ((err = cudaMalloc(&ctx->d_lut, lut_bytes)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc(&ctx->h_lut, lut_bytes, cudaHostAllocDefault)) != cudaSuccess)
+            break;
+
+        size_t pb2 = (size_t)precincts_num * bands_num_all;
+        if ((err = cudaMalloc(&ctx->d_gtli_per_band, pb2 ? pb2 : 1)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_gtli_per_band, pb2 ? pb2 : 1, cudaHostAllocDefault)) != cudaSuccess)
+            break;
+
+        if ((err = cudaMalloc(&ctx->d_error, sizeof(int))) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_error, sizeof(int), cudaHostAllocDefault)) != cudaSuccess)
+            break;
+
+        if ((err = cudaHostAlloc((void**)&ctx->h_gtli, pb ? pb : 1, cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_pack_method, pb ? pb : 1, cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_psd, (pp ? pp : 1) * sizeof(uint32_t), cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_psg, (pp ? pp : 1) * sizeof(uint32_t), cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_pss, (pp ? pp : 1) * sizeof(uint32_t), cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_quant, precincts_num ? precincts_num : 1, cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_refine, precincts_num ? precincts_num : 1, cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_total_bytes, (precincts_num ? precincts_num : 1) * sizeof(uint32_t),
+                                 cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_padding_bytes, (precincts_num ? precincts_num : 1) * sizeof(uint32_t),
+                                 cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_out_offset, (precincts_num ? precincts_num : 1) * sizeof(uint32_t),
+                                 cudaHostAllocDefault)) != cudaSuccess)
             break;
     } while (0);
 
