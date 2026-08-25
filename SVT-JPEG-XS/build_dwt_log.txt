@@ -1,0 +1,1 @@
+[1/1] Linking CXX executable "C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\Release\SvtJpegxsUnitTests.exe"

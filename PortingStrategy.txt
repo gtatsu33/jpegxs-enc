@@ -239,6 +239,15 @@ precinctバイト長など)をダンプし、CUDAカーネルの出力とビッ�
            DWT以外のステージは対象外(Nsightでボトルネックでないことを確認済み)。
            詳細は計画ファイル(セクション11)のPhase 4c節を参照。
 
+           [Phase 4c完了 ── 16ms理想目標 達成] `k_horizontal_lift`を「1スレッド=1行逐次処理」
+           から「1行=1 CUDA block、shared memory協調タイル処理」へ書き換え(5/3 lifting漸化式
+           の`hf`が入力のみに依存し完全並列計算可能・`lf`確定済み`hf`のみに依存し並列計算可能
+           という性質を利用、算術式自体は不変)。`k_vertical_lift`は既にcoalescedなため意図的に
+           無改修。bit-exact: `*Cuda*`テスト20/20 pass(無回帰)。全回帰12057件中12055件パス。
+           実測: CUDA full-frame 18.43ms→**6.98〜7.20ms**、CPU参照22.51〜23.26ms。
+           **16ms理想目標を大きなマージンで達成、33ms現実目標も達成**。Phase 4はこれで
+           完了。詳細は計画ファイル(セクション11)のPhase 4c完了サマリを参照。
+
   [実装上の追加発見] 実際のパイプライン構造は上記の8段階のような独立ステージ
   分割ではなく、「Init(1スレッド) -> Dwt(CPU_PROFILE_CPU時のみ、component単位の
   別スレッドプール) -> Pack(DWT[LOW_LATENCY時はここでインライン計算]+GC+
@@ -369,6 +378,21 @@ Phaseが進むごとに「元のCリファレンス実装」と「CUDA実装」�
   記録)。
   bit-exact検証: `*Cuda*`テスト20/20 pass(Graph replay経路も含め無回帰)。
   回帰: 全12057件中12055件パス(既存2件スキップのみ、回帰ゼロ)。
+
+  Phase 4c実装後の実行結果(4K・10bit・3840x2160、同一条件で再現性確認のため2回計測、
+  20回試行平均、CUDA Graphキャプチャはウォームアップとして計測対象外、ホスト可視レイテンシ):
+    Encode(CUDA, full frame, DWTタイル化後)     GPU  mean ~7.20ms / ~6.98ms(2回計測)
+    Encode(CPU reference, full frame, single-threaded) CPU  mean ~22.51ms / ~23.26ms
+  → **16ms理想目標を大きなマージンで達成(約7ms、目標の半分以下)。33ms現実目標も達成**。
+  `k_horizontal_lift`(Phase4b-2でGPUカーネル時間の91.6%を占めていたボトルネック)を
+  shared memoryタイル化した効果。`bench_phase1_nlt_dwt_gc()`の独立エントリ`NLT+DWT(CUDA)`も
+  12.55ms→約6.80msへ改善し、修正が両呼び出し経路(元のAPI・`_ctx`版)双方に効いていることを
+  確認済み。
+  bit-exact検証: `*Cuda*`テスト20/20 pass(無回帰)。
+  回帰: 全12057件中12055件パス(既存2件スキップのみ、回帰ゼロ)。
+
+  **Phase 4(パイプライン統合+永続バッファ/バッチ化+CUDA Graph+DWTタイル化)は
+  16ms理想目標・33ms現実目標の両方を達成して完了。**
 
 --------------------------------------------------
 11. 実装計画ドキュメントの所在

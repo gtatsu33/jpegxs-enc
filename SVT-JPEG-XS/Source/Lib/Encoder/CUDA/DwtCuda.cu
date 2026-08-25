@@ -47,18 +47,105 @@ __device__ __forceinline__ void dwt_lift53(const int32_t* in, int in_stride, int
     }
 }
 
-/* One thread per row: splits `width` samples of each row into
- * width1=width-width/2 LF samples and width2=width/2 HF samples. */
+/* Phase 4c: shared-memory tiled horizontal lift. One BLOCK per row (was: one
+ * thread per row). This is a pure parallelization/memory-access rewrite --
+ * the arithmetic below is algebraically identical to dwt_lift53() (hf_stride
+ * and lf_stride are always 1 for the horizontal pass, matching the original
+ * dwt_lift53(in_row, 1, lf_row, 1, hf_row, 1, width) call), NOT an
+ * approximation of it.
+ *
+ * Key insight enabling this: hf[id] (id in [0,count)) depends only on the
+ * *input* row (hf[id] = in[2id+1] - ((in[2id]+in[2id+2])>>1)), never on
+ * another hf value -- so all hf entries are embarrassingly parallel. lf[id]
+ * depends only on hf[id-1] and hf[id] (plus the input row), so once hf[] is
+ * known, all lf entries are embarrassingly parallel too. This turns the
+ * CPU-style O(width) *serial* recurrence into two O(width/blockDim) parallel
+ * passes separated by one __syncthreads(), with the whole row cached in
+ * shared memory (loaded once, coalesced across the block, and reused instead
+ * of re-reading global memory for every neighbor access).
+ *
+ * Dynamic shared memory layout: [0,width) = input row samples,
+ * [width, width+width/2) = hf scratch (so lf's pass can read neighboring hf
+ * values without a global-memory round trip). Caller must launch with
+ * dynamic shared bytes = (width + width/2) * sizeof(int32_t) and
+ * grid.x == height (one block per row); see dwt_h_tile_shmem_bytes() below. */
 __global__ void k_horizontal_lift(const int32_t* src, uint32_t pitch, uint32_t sx, uint32_t sy, uint32_t width, uint32_t height,
                                   int32_t* dst_lf, uint32_t lf_pitch, uint32_t lfx, uint32_t lfy, int32_t* dst_hf,
                                   uint32_t hf_pitch, uint32_t hfx, uint32_t hfy) {
-    uint32_t row = blockIdx.x * blockDim.x + threadIdx.x;
+    extern __shared__ int32_t s_mem[];
+    uint32_t row = blockIdx.x;
     if (row >= height)
         return;
+
     const int32_t* in_row = src + (size_t)(sy + row) * pitch + sx;
     int32_t* lf_row = dst_lf + (size_t)(lfy + row) * lf_pitch + lfx;
     int32_t* hf_row = dst_hf + (size_t)(hfy + row) * hf_pitch + hfx;
-    dwt_lift53(in_row, 1, lf_row, 1, hf_row, 1, width);
+
+    int32_t* s_in = s_mem;         /* width elements */
+    int32_t* s_hf = s_mem + width; /* width/2 elements */
+
+    for (uint32_t i = threadIdx.x; i < width; i += blockDim.x) {
+        s_in[i] = in_row[i];
+    }
+    __syncthreads();
+
+    if (width == 2) {
+        if (threadIdx.x == 0) {
+            int32_t hf0 = s_in[1] - s_in[0];
+            hf_row[0] = hf0;
+            lf_row[0] = s_in[0] + ((hf0 + 1) >> 1);
+        }
+        return;
+    }
+
+    uint32_t count = (width - 1) / 2;
+
+    /* Phase 1: hf[0..count) in parallel -- identical formula for every id,
+     * matching the general-case branch of dwt_lift53() (id==0 uses the same
+     * hf formula there too, it's only lf[0] that's special-cased). */
+    for (uint32_t id = threadIdx.x; id < count; id += blockDim.x) {
+        uint32_t k = id * 2;
+        int32_t hf_i = s_in[k + 1] - ((s_in[k] + s_in[k + 2]) >> 1);
+        s_hf[id] = hf_i;
+        hf_row[id] = hf_i;
+    }
+    __syncthreads();
+
+    /* Phase 2: lf[0..count) in parallel, reading only already-finalized hf
+     * values from shared memory. */
+    for (uint32_t id = threadIdx.x; id < count; id += blockDim.x) {
+        int32_t hf_i = s_hf[id];
+        if (id == 0) {
+            lf_row[0] = s_in[0] + ((hf_i + 1) >> 1);
+        }
+        else {
+            uint32_t k = id * 2;
+            int32_t hf_prev = s_hf[id - 1];
+            lf_row[id] = s_in[k] + ((hf_prev + hf_i + 2) >> 2);
+        }
+    }
+
+    /* Phase 3: trailing boundary sample (matches dwt_lift53()'s tail branch
+     * exactly -- single thread, negligible cost, needs only s_hf[count-1]
+     * which phase 1's __syncthreads() above already made visible). */
+    if (threadIdx.x == 0) {
+        int32_t hf_prev = s_hf[count - 1];
+        if (!(width & 1)) {
+            uint32_t last = width / 2 - 1;
+            int32_t hf_i = s_in[width - 1] - s_in[width - 2];
+            hf_row[last] = hf_i;
+            lf_row[last] = s_in[width - 2] + ((hf_prev + hf_i + 2) >> 2);
+        }
+        else {
+            lf_row[width / 2] = s_in[width - 1] + ((hf_prev + 1) >> 1);
+        }
+    }
+}
+
+/* Launch config helpers for the tiled k_horizontal_lift above. */
+#define DWT_H_TILE_THREADS 256
+static inline size_t dwt_h_tile_shmem_bytes(uint32_t width) {
+    return (size_t)(width + width / 2) * sizeof(int32_t);
 }
 
 /* One thread per column: splits `height` samples of each column into
@@ -209,8 +296,7 @@ int svt_cuda_dwt_component(const void* in_plane, uint32_t plane_stride, uint32_t
                                                0,
                                                h1); // V-HF -> rows [h1,h1+h2)
 
-            uint32_t grow_up = (h1 + THREADS - 1) / THREADS;
-            k_horizontal_lift<<<grow_up, THREADS>>>(d_vert,
+            k_horizontal_lift<<<h1, DWT_H_TILE_THREADS, dwt_h_tile_shmem_bytes(active_w)>>>(d_vert,
                                                     comp_width,
                                                     0,
                                                     0,
@@ -225,8 +311,7 @@ int svt_cuda_dwt_component(const void* in_plane, uint32_t plane_stride, uint32_t
                                                     w1,
                                                     0); // HL -> finalized
 
-            uint32_t grow_down = (h2 + THREADS - 1) / THREADS;
-            k_horizontal_lift<<<grow_down, THREADS>>>(d_vert,
+            k_horizontal_lift<<<h2, DWT_H_TILE_THREADS, dwt_h_tile_shmem_bytes(active_w)>>>(d_vert,
                                                       comp_width,
                                                       0,
                                                       h1,
@@ -252,8 +337,7 @@ int svt_cuda_dwt_component(const void* in_plane, uint32_t plane_stride, uint32_t
          * applied only to the LL path. */
         for (uint32_t hh = decom_v; hh < decom_h; hh++) {
             uint32_t w2 = active_w / 2, w1 = active_w - w2;
-            uint32_t grow = (active_h + THREADS - 1) / THREADS;
-            k_horizontal_lift<<<grow, THREADS>>>(d_cur,
+            k_horizontal_lift<<<active_h, DWT_H_TILE_THREADS, dwt_h_tile_shmem_bytes(active_w)>>>(d_cur,
                                                  comp_width,
                                                  0,
                                                  0,
@@ -360,8 +444,7 @@ int svt_cuda_dwt_component_ctx(const void* in_plane, uint32_t plane_stride, uint
                                                        0,
                                                        h1);
 
-        uint32_t grow_up = (h1 + THREADS - 1) / THREADS;
-        k_horizontal_lift<<<grow_up, THREADS, 0, stream>>>(d_vert,
+        k_horizontal_lift<<<h1, DWT_H_TILE_THREADS, dwt_h_tile_shmem_bytes(active_w), stream>>>(d_vert,
                                                             comp_width,
                                                             0,
                                                             0,
@@ -376,8 +459,7 @@ int svt_cuda_dwt_component_ctx(const void* in_plane, uint32_t plane_stride, uint
                                                             w1,
                                                             0);
 
-        uint32_t grow_down = (h2 + THREADS - 1) / THREADS;
-        k_horizontal_lift<<<grow_down, THREADS, 0, stream>>>(d_vert,
+        k_horizontal_lift<<<h2, DWT_H_TILE_THREADS, dwt_h_tile_shmem_bytes(active_w), stream>>>(d_vert,
                                                               comp_width,
                                                               0,
                                                               h1,
@@ -401,8 +483,7 @@ int svt_cuda_dwt_component_ctx(const void* in_plane, uint32_t plane_stride, uint
 
     for (uint32_t hh = decom_v; hh < decom_h; hh++) {
         uint32_t w2 = active_w / 2, w1 = active_w - w2;
-        uint32_t grow = (active_h + THREADS - 1) / THREADS;
-        k_horizontal_lift<<<grow, THREADS, 0, stream>>>(d_cur,
+        k_horizontal_lift<<<active_h, DWT_H_TILE_THREADS, dwt_h_tile_shmem_bytes(active_w), stream>>>(d_cur,
                                                          comp_width,
                                                          0,
                                                          0,
