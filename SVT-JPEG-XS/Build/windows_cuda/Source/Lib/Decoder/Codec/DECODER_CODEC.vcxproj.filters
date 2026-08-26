@@ -1,0 +1,114 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\BitstreamReader.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DecHandle.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DecThreadFinal.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DecThreadInit.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DecThreadSlice.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DecThreads.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Decoder.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Dequant.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DwtDecoder.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Idwt.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Mct.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\NltDec.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Packing.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\ParseHeader.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Precinct.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\decoder_dsp_rtcd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\BitstreamReader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DecHandle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DecThreadFinal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DecThreadInit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DecThreadSlice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DecThreads.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Decoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Dequant.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\DwtDecoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Idwt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Mct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\NltDec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Packing.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\ParseHeader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\Precinct.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\decoder_dsp_rtcd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{599DE128-EFAB-31CE-A298-71691661C392}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{25B413E2-FFA6-3998-B112-4C7C8EB3AFC3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

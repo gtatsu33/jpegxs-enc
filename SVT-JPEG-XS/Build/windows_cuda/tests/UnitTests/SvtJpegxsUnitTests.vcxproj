@@ -1,0 +1,637 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{55931B78-A0CC-302B-AE6C-C92785858DC1}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>SvtJpegxsUnitTests</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 13.3.props" />
+    <Import Project="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\tests\UnitTests\SvtJpegxsUnitTests.dir\nasm.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">SvtJpegxsUnitTests.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">SvtJpegxsUnitTests</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SvtJpegxsUnitTests.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SvtJpegxsUnitTests</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">SvtJpegxsUnitTests.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">SvtJpegxsUnitTests</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">SvtJpegxsUnitTests.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">SvtJpegxsUnitTests</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</GenerateManifest>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/third_party/googletest-1.14.0/googletest/include" /external:I "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/third_party/googletest-1.14.0/googletest" /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/include" /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/include/cccl"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR=\"C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata\";ARCH_X86_64=1;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <CudaCompile>
+      <Include>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(Include)</Include>
+      <Defines>%(Defines);_WINDOWS;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="Debug"</Defines>
+      <AdditionalOptions>%(AdditionalOptions) -std=c++14 --generate-code=arch=compute_120,code=[compute_120,sm_120] -Xcompiler="/EHsc -Zi -Ob0"</AdditionalOptions>
+      <CodeGeneration></CodeGeneration>
+      <CompileOut>$(IntDir)%(Filename).obj</CompileOut>
+      <CudaRuntime>Static</CudaRuntime>
+      <GPUDebugInfo>false</GPUDebugInfo>
+      <Optimization>Od</Optimization>
+      <Runtime>MDd</Runtime>
+      <RuntimeChecks>RTC1</RuntimeChecks>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <TypeInfo>true</TypeInfo>
+      <UseHostInclude>false</UseHostInclude>
+      <Warning>W3</Warning>
+    </CudaCompile>
+    <NASM>
+      <IncludePaths>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl\;%(IncludePaths)</IncludePaths>
+      <AdditionalOptions>-gcv8</AdditionalOptions>
+      <Outputswitch>1</Outputswitch>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN64</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+    </NASM>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Link>
+      <AdditionalDependencies>..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\EncDec.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\ImageBuffer.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\Pi.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtLog.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtUtility.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtMalloc.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtThreads.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SystemResourceManager.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\common_dsp_rtcd.obj;..\..\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.dir\$(Configuration)\PictureOperators_SSE2.obj;..\..\Source\Lib\Common\ASM_AVX2\COMMON_ASM_AVX2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\BinarySearch.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\BitstreamWriter.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\Dwt.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\DwtInput.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\DwtStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\EncHandle.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\FinalStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\GcStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\InitStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\NltEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackHeaders.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackIn.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackOut.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackPrecinct.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PiEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PictureControlSet.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PreRcStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PrecinctEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\ProfileLevel.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\Quant.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\QuantStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\RateControl.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\WeightTable.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\encoder_dsp_rtcd.obj;..\..\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\$(Configuration)\ASM_SSE2.obj;..\..\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.dir\$(Configuration)\Quant_sse4_1.obj;..\..\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.dir\$(Configuration)\group_coding_sse4_1.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\Dwt_AVX2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\NltEnc_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\Quant_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\RateControl_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Enc_avx512.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Pack_avx512.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Quant_avx512.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\BitstreamReader.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecHandle.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadFinal.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadInit.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadSlice.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreads.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Decoder.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Dequant.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DwtDecoder.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Idwt.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Mct.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\NltDec.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Packing.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\ParseHeader.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Precinct.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\decoder_dsp_rtcd.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\Dequant_avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\NltDec_avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\idwt-avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\Dwt53Decoder_AVX2.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\NltDec_AVX2.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\UnPack_avx2.obj;..\..\Source\Lib\Decoder\ASM_SSE4_1\DECODER_ASM_SSE4_1.dir\$(Configuration)\Dequant_SSE4.obj;UnitTest_AVX512\SvtJpegxsUnitTests_AVX512.dir\$(Configuration)\CodeDeprecated-avx512.obj;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\cudart.lib;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\Debug\gtest_main.lib;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\Debug\gtest.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Debug/SvtJpegxsUnitTests.lib</ImportLibrary>
+      <ProgramDataBaseFile>C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Debug/SvtJpegxsUnitTests.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <CudaLink>
+      <AdditionalOptions>-forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets </AdditionalOptions>
+      <PerformDeviceLink>false</PerformDeviceLink>
+    </CudaLink>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/third_party/googletest-1.14.0/googletest/include" /external:I "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/third_party/googletest-1.14.0/googletest" /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/include" /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/include/cccl"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR=\"C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata\";ARCH_X86_64=1;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <CudaCompile>
+      <Include>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(Include)</Include>
+      <Defines>%(Defines);_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="Release"</Defines>
+      <AdditionalOptions>%(AdditionalOptions) -std=c++14 --generate-code=arch=compute_120,code=[compute_120,sm_120] -Xcompiler="/EHsc -Ob2"</AdditionalOptions>
+      <CodeGeneration></CodeGeneration>
+      <CompileOut>$(IntDir)%(Filename).obj</CompileOut>
+      <CudaRuntime>Static</CudaRuntime>
+      <GPUDebugInfo>false</GPUDebugInfo>
+      <Optimization>O2</Optimization>
+      <Runtime>MD</Runtime>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <TypeInfo>true</TypeInfo>
+      <UseHostInclude>false</UseHostInclude>
+      <Warning>W3</Warning>
+    </CudaCompile>
+    <NASM>
+      <IncludePaths>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl\;%(IncludePaths)</IncludePaths>
+      <Outputswitch>1</Outputswitch>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN64</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+    </NASM>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Link>
+      <AdditionalDependencies>..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\EncDec.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\ImageBuffer.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\Pi.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtLog.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtUtility.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtMalloc.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtThreads.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SystemResourceManager.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\common_dsp_rtcd.obj;..\..\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.dir\$(Configuration)\PictureOperators_SSE2.obj;..\..\Source\Lib\Common\ASM_AVX2\COMMON_ASM_AVX2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\BinarySearch.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\BitstreamWriter.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\Dwt.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\DwtInput.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\DwtStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\EncHandle.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\FinalStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\GcStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\InitStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\NltEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackHeaders.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackIn.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackOut.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackPrecinct.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PiEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PictureControlSet.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PreRcStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PrecinctEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\ProfileLevel.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\Quant.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\QuantStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\RateControl.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\WeightTable.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\encoder_dsp_rtcd.obj;..\..\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\$(Configuration)\ASM_SSE2.obj;..\..\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.dir\$(Configuration)\Quant_sse4_1.obj;..\..\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.dir\$(Configuration)\group_coding_sse4_1.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\Dwt_AVX2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\NltEnc_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\Quant_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\RateControl_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Enc_avx512.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Pack_avx512.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Quant_avx512.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\BitstreamReader.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecHandle.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadFinal.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadInit.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadSlice.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreads.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Decoder.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Dequant.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DwtDecoder.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Idwt.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Mct.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\NltDec.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Packing.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\ParseHeader.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Precinct.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\decoder_dsp_rtcd.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\Dequant_avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\NltDec_avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\idwt-avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\Dwt53Decoder_AVX2.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\NltDec_AVX2.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\UnPack_avx2.obj;..\..\Source\Lib\Decoder\ASM_SSE4_1\DECODER_ASM_SSE4_1.dir\$(Configuration)\Dequant_SSE4.obj;UnitTest_AVX512\SvtJpegxsUnitTests_AVX512.dir\$(Configuration)\CodeDeprecated-avx512.obj;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\cudart.lib;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\Release\gtest_main.lib;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\Release\gtest.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.lib</ImportLibrary>
+      <ProgramDataBaseFile>C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <CudaLink>
+      <AdditionalOptions>-forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets </AdditionalOptions>
+      <PerformDeviceLink>false</PerformDeviceLink>
+    </CudaLink>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/third_party/googletest-1.14.0/googletest/include" /external:I "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/third_party/googletest-1.14.0/googletest" /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/include" /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/include/cccl"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR=\"C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata\";ARCH_X86_64=1;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <CudaCompile>
+      <Include>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(Include)</Include>
+      <Defines>%(Defines);_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="MinSizeRel"</Defines>
+      <AdditionalOptions>%(AdditionalOptions) -std=c++14 --generate-code=arch=compute_120,code=[compute_120,sm_120] -Xcompiler="/EHsc -Ob1"</AdditionalOptions>
+      <CodeGeneration></CodeGeneration>
+      <CompileOut>$(IntDir)%(Filename).obj</CompileOut>
+      <CudaRuntime>Static</CudaRuntime>
+      <GPUDebugInfo>false</GPUDebugInfo>
+      <Optimization>O1</Optimization>
+      <Runtime>MD</Runtime>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <TypeInfo>true</TypeInfo>
+      <UseHostInclude>false</UseHostInclude>
+      <Warning>W3</Warning>
+    </CudaCompile>
+    <NASM>
+      <IncludePaths>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl\;%(IncludePaths)</IncludePaths>
+      <Outputswitch>1</Outputswitch>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN64</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+    </NASM>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Link>
+      <AdditionalDependencies>..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\EncDec.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\ImageBuffer.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\Pi.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtLog.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtUtility.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtMalloc.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtThreads.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SystemResourceManager.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\common_dsp_rtcd.obj;..\..\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.dir\$(Configuration)\PictureOperators_SSE2.obj;..\..\Source\Lib\Common\ASM_AVX2\COMMON_ASM_AVX2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\BinarySearch.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\BitstreamWriter.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\Dwt.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\DwtInput.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\DwtStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\EncHandle.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\FinalStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\GcStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\InitStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\NltEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackHeaders.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackIn.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackOut.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackPrecinct.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PiEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PictureControlSet.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PreRcStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PrecinctEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\ProfileLevel.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\Quant.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\QuantStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\RateControl.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\WeightTable.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\encoder_dsp_rtcd.obj;..\..\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\$(Configuration)\ASM_SSE2.obj;..\..\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.dir\$(Configuration)\Quant_sse4_1.obj;..\..\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.dir\$(Configuration)\group_coding_sse4_1.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\Dwt_AVX2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\NltEnc_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\Quant_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\RateControl_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Enc_avx512.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Pack_avx512.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Quant_avx512.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\BitstreamReader.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecHandle.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadFinal.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadInit.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadSlice.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreads.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Decoder.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Dequant.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DwtDecoder.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Idwt.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Mct.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\NltDec.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Packing.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\ParseHeader.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Precinct.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\decoder_dsp_rtcd.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\Dequant_avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\NltDec_avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\idwt-avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\Dwt53Decoder_AVX2.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\NltDec_AVX2.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\UnPack_avx2.obj;..\..\Source\Lib\Decoder\ASM_SSE4_1\DECODER_ASM_SSE4_1.dir\$(Configuration)\Dequant_SSE4.obj;UnitTest_AVX512\SvtJpegxsUnitTests_AVX512.dir\$(Configuration)\CodeDeprecated-avx512.obj;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\cudart.lib;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\MinSizeRel\gtest_main.lib;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\MinSizeRel\gtest.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/MinSizeRel/SvtJpegxsUnitTests.lib</ImportLibrary>
+      <ProgramDataBaseFile>C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/MinSizeRel/SvtJpegxsUnitTests.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <CudaLink>
+      <AdditionalOptions>-forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets </AdditionalOptions>
+      <PerformDeviceLink>false</PerformDeviceLink>
+    </CudaLink>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/third_party/googletest-1.14.0/googletest/include" /external:I "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/third_party/googletest-1.14.0/googletest" /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/include" /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/include/cccl"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR=\"C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata\";ARCH_X86_64=1;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <CudaCompile>
+      <Include>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(Include)</Include>
+      <Defines>%(Defines);_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="RelWithDebInfo"</Defines>
+      <AdditionalOptions>%(AdditionalOptions) -std=c++14 --generate-code=arch=compute_120,code=[compute_120,sm_120] -Xcompiler="/EHsc -Zi -Ob1"</AdditionalOptions>
+      <CodeGeneration></CodeGeneration>
+      <CompileOut>$(IntDir)%(Filename).obj</CompileOut>
+      <CudaRuntime>Static</CudaRuntime>
+      <GPUDebugInfo>false</GPUDebugInfo>
+      <Optimization>O2</Optimization>
+      <Runtime>MD</Runtime>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <TypeInfo>true</TypeInfo>
+      <UseHostInclude>false</UseHostInclude>
+      <Warning>W3</Warning>
+    </CudaCompile>
+    <NASM>
+      <IncludePaths>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include\;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl\;%(IncludePaths)</IncludePaths>
+      <Outputswitch>1</Outputswitch>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN64</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;BUILD_TESTING;SVT_ENABLE_CUDA;TESTDATA_DIR="C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/../testdata";ARCH_X86_64=1;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+    </NASM>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\UnitTest_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\API;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\Codec;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX512;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_AVX2;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Decoder\ASM_SSE4_1;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\CUDA;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\stb_image;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest\include;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\third_party\googletest-1.14.0\googletest;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\include\cccl;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Link>
+      <AdditionalDependencies>..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\EncDec.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\ImageBuffer.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\Pi.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtLog.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtUtility.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtMalloc.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtThreads.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SystemResourceManager.obj;..\..\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\common_dsp_rtcd.obj;..\..\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.dir\$(Configuration)\PictureOperators_SSE2.obj;..\..\Source\Lib\Common\ASM_AVX2\COMMON_ASM_AVX2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\BinarySearch.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\BitstreamWriter.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\Dwt.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\DwtInput.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\DwtStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\EncHandle.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\FinalStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\GcStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\InitStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\NltEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackHeaders.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackIn.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackOut.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackPrecinct.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PiEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PictureControlSet.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PreRcStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PrecinctEnc.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\ProfileLevel.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\Quant.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\QuantStageProcess.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\RateControl.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\WeightTable.obj;..\..\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\encoder_dsp_rtcd.obj;..\..\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\$(Configuration)\empty.obj;..\..\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\$(Configuration)\ASM_SSE2.obj;..\..\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.dir\$(Configuration)\Quant_sse4_1.obj;..\..\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.dir\$(Configuration)\group_coding_sse4_1.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\Dwt_AVX2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\NltEnc_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\Quant_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\RateControl_avx2.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Enc_avx512.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Pack_avx512.obj;..\..\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Quant_avx512.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\BitstreamReader.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecHandle.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadFinal.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadInit.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadSlice.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreads.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Decoder.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Dequant.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DwtDecoder.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Idwt.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Mct.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\NltDec.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Packing.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\ParseHeader.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Precinct.obj;..\..\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\decoder_dsp_rtcd.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\Dequant_avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\NltDec_avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\idwt-avx512.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\Dwt53Decoder_AVX2.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\NltDec_AVX2.obj;..\..\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\UnPack_avx2.obj;..\..\Source\Lib\Decoder\ASM_SSE4_1\DECODER_ASM_SSE4_1.dir\$(Configuration)\Dequant_SSE4.obj;UnitTest_AVX512\SvtJpegxsUnitTests_AVX512.dir\$(Configuration)\CodeDeprecated-avx512.obj;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\cudart.lib;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\RelWithDebInfo\gtest_main.lib;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Bin\RelWithDebInfo\gtest.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/RelWithDebInfo/SvtJpegxsUnitTests.lib</ImportLibrary>
+      <ProgramDataBaseFile>C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/RelWithDebInfo/SvtJpegxsUnitTests.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <CudaLink>
+      <AdditionalOptions>-forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets </AdditionalOptions>
+      <PerformDeviceLink>false</PerformDeviceLink>
+    </CudaLink>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/tests/UnitTests/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS" "-BC:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Build/windows_cuda" --check-stamp-file "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Build/windows_cuda/tests/UnitTests/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\share\cmake-3.31\Templates\MSBuild\nasm.props.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\tests\UnitTests\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/tests/UnitTests/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS" "-BC:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Build/windows_cuda" --check-stamp-file "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Build/windows_cuda/tests/UnitTests/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\share\cmake-3.31\Templates\MSBuild\nasm.props.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\tests\UnitTests\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/tests/UnitTests/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS" "-BC:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Build/windows_cuda" --check-stamp-file "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Build/windows_cuda/tests/UnitTests/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\share\cmake-3.31\Templates\MSBuild\nasm.props.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\tests\UnitTests\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/tests/UnitTests/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS" "-BC:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Build/windows_cuda" --check-stamp-file "C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Build/windows_cuda/tests/UnitTests/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\share\cmake-3.31\Templates\MSBuild\nasm.props.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\tests\UnitTests\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\CodeDeprecated.cc" />
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\CodeDeprecated.h" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\DecoderSimple.cc" />
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\DecoderSimple.h" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\SampleFramesData.cc" />
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\SampleFramesData.h" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestApiValidation.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBitstreamReadWrite.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestDecoder.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestDequant.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestDwtFrame.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestDwtIdwt.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestFormatConvert.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestFourComponentAlpha.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestGcStageProcess.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestIDWT53.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestInvDwtFrame.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestMsbAligned.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestNlt.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestPack.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestPi.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestProfileLevel.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestQuant.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestReateControl.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestSample.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestStreamProfileLevelCli.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestSvtLog.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestUnPack.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestVariableLengthCoding.cc" />
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\random.h" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp\EncAppConfig.c" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisect444Cuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisectDwtCtx444Cuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisectRcLutRealCuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisectRealCrop444Cuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisectRealDwtCuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisectSmall444Cuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestDwtCuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestEncodeFrameCuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestGcCuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestNltCuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestPackCuda.cc" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestRcQuantCuda.cc" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\CudaSmokeTest.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\DwtCuda.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\EncodeFrameCuda.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\FrameContextCuda.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\GcCuda.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\NltCuda.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\PackCuda.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\RcQuantCuda.obj" />
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common\PixelIo.c" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\src\init.c.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\api.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\x86_init.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\vendor.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\isa.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\src\x86\windows\init.c.obj" />
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\deps\clog\clog.dir\$(Configuration)\clog.obj" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\ZERO_CHECK.vcxproj">
+      <Project>{8ADE08CB-9319-3E24-9E86-4C4470B91081}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\ASM_AVX2\COMMON_ASM_AVX2.vcxproj">
+      <Project>{10D558FB-E9CF-39C8-A6DD-6DD74F7CFEB8}</Project>
+      <Name>COMMON_ASM_AVX2</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.vcxproj">
+      <Project>{D13515C8-FE9B-3BBF-8DED-FB2E487226BC}</Project>
+      <Name>COMMON_ASM_SSE2</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\Codec\COMMON_CODEC.vcxproj">
+      <Project>{8AE41311-133B-3A9C-9F8C-0C1272263FA4}</Project>
+      <Name>COMMON_CODEC</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.vcxproj">
+      <Project>{BC64EAD1-4118-349B-8E0B-14682EFC21C1}</Project>
+      <Name>DECODER_ASM_AVX2</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.vcxproj">
+      <Project>{2D7F63AE-9244-37DE-9DFA-FED52E59E0AB}</Project>
+      <Name>DECODER_ASM_AVX512</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_SSE4_1\DECODER_ASM_SSE4_1.vcxproj">
+      <Project>{7E7FF991-A11C-3660-9CAA-E87FC8006E8D}</Project>
+      <Name>DECODER_ASM_SSE4_1</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.vcxproj">
+      <Project>{3A05BB67-4F1A-3312-A41B-3211A9130D92}</Project>
+      <Name>DECODER_CODEC</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.vcxproj">
+      <Project>{53FEDDC0-DC90-304F-B54B-57850EEF81F6}</Project>
+      <Name>ENCODER_ASM_AVX2</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.vcxproj">
+      <Project>{D2E493B4-FC31-3643-87A9-5211ADECE813}</Project>
+      <Name>ENCODER_ASM_AVX512</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.vcxproj">
+      <Project>{59982AD0-8F71-3B62-A64B-AE9C1DD54C56}</Project>
+      <Name>ENCODER_ASM_SSE2</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.vcxproj">
+      <Project>{74B1A155-8EFA-360A-A118-5A8C791B5BD1}</Project>
+      <Name>ENCODER_ASM_SSE4_1</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.vcxproj">
+      <Project>{539A7D12-6A62-3227-8104-D318DB5D2DDD}</Project>
+      <Name>ENCODER_CODEC</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.vcxproj">
+      <Project>{A406C921-9C64-3673-8E81-F0D741FB0DD7}</Project>
+      <Name>ENCODER_CUDA</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\SvtJpegxsLib.vcxproj">
+      <Project>{6F6FD825-9159-31BF-9D83-CA44C26343B7}</Project>
+      <Name>SvtJpegxsLib</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\tests\UnitTests\UnitTest_AVX512\SvtJpegxsUnitTests_AVX512.vcxproj">
+      <Project>{DFAEB6D2-DB6C-3F8C-832D-B4C70911F702}</Project>
+      <Name>SvtJpegxsUnitTests_AVX512</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\deps\clog\clog.vcxproj">
+      <Project>{484B0759-57A1-35C3-9169-C37F48C3F080}</Project>
+      <Name>clog</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.vcxproj">
+      <Project>{AA096F5D-1C4D-378B-AAAD-58839DABC96D}</Project>
+      <Name>cpuinfo</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\googletest-1.14.0\googletest\gtest.vcxproj">
+      <Project>{044DE546-6951-3BD2-B20F-35BA2B488B3B}</Project>
+      <Name>gtest</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\googletest-1.14.0\googletest\gtest_main.vcxproj">
+      <Project>{325EBD23-1B0C-3715-B613-5816D9D139A8}</Project>
+      <Name>gtest_main</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 13.3.targets" />
+    <Import Project="C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\share\cmake-3.31\Templates\MSBuild\nasm.targets" />
+  </ImportGroup>
+</Project>

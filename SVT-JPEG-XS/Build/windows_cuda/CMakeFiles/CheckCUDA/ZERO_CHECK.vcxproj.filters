@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\CMakeFiles\CheckCUDA\CMakeFiles\98e90003b0f0d2fa411267ce7eb92988\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{D06A7467-72B6-33E3-A54B-A524FF51FF35}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

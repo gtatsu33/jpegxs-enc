@@ -1,0 +1,271 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\EncDec.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\ImageBuffer.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\Pi.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtLog.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtUtility.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtMalloc.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SvtThreads.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\SystemResourceManager.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\Codec\COMMON_CODEC.dir\$(Configuration)\common_dsp_rtcd.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\ASM_AVX2\COMMON_ASM_AVX2.dir\$(Configuration)\empty.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.dir\$(Configuration)\empty.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Common\ASM_SSE2\COMMON_ASM_SSE2.dir\$(Configuration)\PictureOperators_SSE2.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\BinarySearch.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\BitstreamWriter.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\Dwt.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\DwtInput.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\DwtStageProcess.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\EncHandle.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\FinalStageProcess.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\GcStageProcess.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\InitStageProcess.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\NltEnc.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackHeaders.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackIn.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackOut.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackPrecinct.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PackStageProcess.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PiEnc.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PictureControlSet.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PreRcStageProcess.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\PrecinctEnc.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\ProfileLevel.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\Quant.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\QuantStageProcess.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\RateControl.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\WeightTable.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\$(Configuration)\encoder_dsp_rtcd.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\$(Configuration)\empty.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\$(Configuration)\ASM_SSE2.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.dir\$(Configuration)\Quant_sse4_1.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_SSE4_1\ENCODER_ASM_SSE4_1.dir\$(Configuration)\group_coding_sse4_1.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\Dwt_AVX2.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\NltEnc_avx2.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\Quant_avx2.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\$(Configuration)\RateControl_avx2.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Enc_avx512.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Pack_avx512.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX512\ENCODER_ASM_AVX512.dir\$(Configuration)\Quant_avx512.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\BitstreamReader.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecHandle.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadFinal.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadInit.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreadSlice.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DecThreads.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Decoder.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Dequant.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\DwtDecoder.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Idwt.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Mct.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\NltDec.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Packing.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\ParseHeader.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\Precinct.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\Codec\DECODER_CODEC.dir\$(Configuration)\decoder_dsp_rtcd.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\Dequant_avx512.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\NltDec_avx512.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\$(Configuration)\idwt-avx512.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\Dwt53Decoder_AVX2.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\NltDec_AVX2.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_AVX2\DECODER_ASM_AVX2.dir\$(Configuration)\UnPack_avx2.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_SSE4_1\DECODER_ASM_SSE4_1.dir\$(Configuration)\Dequant_SSE4.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\CudaSmokeTest.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\DwtCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\EncodeFrameCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\FrameContextCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\GcCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\NltCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\PackCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\RcQuantCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\src\init.c.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\api.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\x86_init.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\vendor.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\isa.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\src\x86\windows\init.c.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\deps\clog\clog.dir\$(Configuration)\clog.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Object Libraries">
+      <UniqueIdentifier>{BE866886-C37D-3DA3-B0BA-2D7CDE9C1EDA}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

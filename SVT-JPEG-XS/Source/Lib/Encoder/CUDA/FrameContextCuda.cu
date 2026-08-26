@@ -48,6 +48,12 @@ static void fcc_free_all(SvtCudaFrameContext* ctx) {
     cudaFree(ctx->d_packets);
     free(ctx->h_packets);
     free(ctx->h_bands);
+    free(ctx->h_packet_size_gcli_raw_bytes);
+    cudaFree(ctx->d_packet_methods_raw);
+    cudaFreeHost(ctx->h_packet_methods_raw);
+    free(ctx->h_packets_exist);
+    cudaFree(ctx->d_packet_offset);
+    cudaFreeHost(ctx->h_packet_offset);
 
     cudaFree(ctx->d_comp_stride);
     cudaFree(ctx->d_lut);
@@ -225,6 +231,15 @@ int svt_cuda_frame_context_create(SvtCudaFrameContext* ctx, uint32_t comps_num, 
         if ((err = cudaHostAlloc((void**)&ctx->h_gtli, pb ? pb : 1, cudaHostAllocDefault)) != cudaSuccess)
             break;
         if ((err = cudaHostAlloc((void**)&ctx->h_pack_method, pb ? pb : 1, cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaMalloc(&ctx->d_packet_methods_raw, pp ? pp : 1)) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_packet_methods_raw, pp ? pp : 1, cudaHostAllocDefault)) != cudaSuccess)
+            break;
+        if ((err = cudaMalloc(&ctx->d_packet_offset, (pp ? pp : 1) * sizeof(uint32_t))) != cudaSuccess)
+            break;
+        if ((err = cudaHostAlloc((void**)&ctx->h_packet_offset, (pp ? pp : 1) * sizeof(uint32_t), cudaHostAllocDefault)) !=
+            cudaSuccess)
             break;
         if ((err = cudaHostAlloc((void**)&ctx->h_psd, (pp ? pp : 1) * sizeof(uint32_t), cudaHostAllocDefault)) != cudaSuccess)
             break;

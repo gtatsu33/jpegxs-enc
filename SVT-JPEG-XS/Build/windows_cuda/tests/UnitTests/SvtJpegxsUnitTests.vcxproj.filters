@@ -1,0 +1,200 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\CodeDeprecated.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\DecoderSimple.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\SampleFramesData.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestApiValidation.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBitstreamReadWrite.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestDecoder.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestDequant.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestDwtFrame.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestDwtIdwt.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestFormatConvert.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestFourComponentAlpha.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestGcStageProcess.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestIDWT53.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestInvDwtFrame.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestMsbAligned.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestNlt.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestPack.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestPi.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestProfileLevel.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestQuant.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestReateControl.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestSample.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestStreamProfileLevelCli.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestSvtLog.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestUnPack.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestVariableLengthCoding.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\EncApp\EncAppConfig.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisect444Cuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisectDwtCtx444Cuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisectRcLutRealCuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisectRealCrop444Cuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisectRealDwtCuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestBisectSmall444Cuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestDwtCuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestEncodeFrameCuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestGcCuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestNltCuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestPackCuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\TestRcQuantCuda.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\App\Common\PixelIo.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\CodeDeprecated.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\DecoderSimple.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\SampleFramesData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\random.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\tests\UnitTests\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\CudaSmokeTest.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\DwtCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\EncodeFrameCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\FrameContextCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\GcCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\NltCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\PackCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\CUDA\ENCODER_CUDA.dir\$(Configuration)\RcQuantCuda.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\src\init.c.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\api.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\x86_init.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\vendor.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\isa.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\cpuinfo.dir\$(Configuration)\src\x86\windows\init.c.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+    <Object Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\third_party\cpuinfo\deps\clog\clog.dir\$(Configuration)\clog.obj">
+      <Filter>Object Libraries</Filter>
+    </Object>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{599DE128-EFAB-31CE-A298-71691661C392}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Object Libraries">
+      <UniqueIdentifier>{BE866886-C37D-3DA3-B0BA-2D7CDE9C1EDA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{25B413E2-FFA6-3998-B112-4C7C8EB3AFC3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

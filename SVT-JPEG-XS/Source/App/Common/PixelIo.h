@@ -18,7 +18,10 @@ extern "C" {
  * (P6, interleaved RGB) is implemented today -- see PortingStrategy.txt
  * section 12.
  */
-typedef enum PixelLayout { PIXEL_LAYOUT_RGB_INTERLEAVED = 0 } PixelLayout_t;
+typedef enum PixelLayout {
+    PIXEL_LAYOUT_RGB_INTERLEAVED = 0,
+    PIXEL_LAYOUT_YUV422_PLANAR_8BIT = 1 /* Y plane, then U plane, then V plane; U/V are half-width, full-height */
+} PixelLayout_t;
 
 typedef struct PixelImage {
     uint32_t width;
@@ -39,6 +42,15 @@ typedef struct PixelImage {
  * range.
  */
 int pixel_image_load_ppm(const char* path, PixelImage_t* out_image);
+
+/* Loads a raw, headerless planar YUV422 8-bit frame (Y plane, then U, then V;
+ * U/V half-width/full-height, no row padding) -- e.g. ffmpeg's "yuv422p"
+ * pixel format, one frame per file. width/height must be supplied by the
+ * caller (the format carries no header). Returns 0 on success, non-zero if
+ * the file size doesn't match width*height + 2*(width/2)*height exactly, or
+ * on any I/O error (message printed to stderr).
+ */
+int pixel_image_load_yuv422p8(const char* path, uint32_t width, uint32_t height, PixelImage_t* out_image);
 
 void pixel_image_free(PixelImage_t* image);
 

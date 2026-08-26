@@ -6,8 +6,33 @@
 #include <vector>
 #include <algorithm>
 #include <cstring>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include "EncodeFrameCuda.cuh"
 #include "DwtCuda.cuh"
+
+/* Opt-in sub-phase timing (SVT_CUDA_PROFILE=1 in the environment), added
+ * while investigating why real-image svt_cuda_encode_frame() latency (~22ms
+ * warm on 4K chart_color/eval_fantom1) is far above the Phase4c benchmark
+ * figure (~7ms, measured on a single memset(0x55)-constant frame -- see
+ * PortingStrategy.txt section 10 correction). Off by default: zero overhead
+ * for normal callers/tests, and does not change any captured graph content
+ * (all timer calls sit strictly outside the two cudaStreamBeginCapture/
+ * cudaStreamEndCapture regions). */
+static inline bool efc_profile_enabled() {
+    static const bool enabled = (std::getenv("SVT_CUDA_PROFILE") != nullptr);
+    return enabled;
+}
+struct EfcProfileTimer {
+    std::chrono::steady_clock::time_point t0;
+    void start() {
+        t0 = std::chrono::steady_clock::now();
+    }
+    double stop_ms() {
+        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    }
+};
 #include "PackCuda.cuh" /* svt_cuda_pack_packet_t */
 
 #define EFC_GROUP_SIZE 4
@@ -104,6 +129,32 @@ int svt_cuda_frame_context_create_from_pi(SvtCudaFrameContext* ctx, const pi_t* 
      * device on every svt_cuda_encode_frame() call. */
     ctx->h_packets = malloc(pi->packets_num * sizeof(svt_cuda_pack_packet_t));
     memcpy(ctx->h_packets, packets.data(), pi->packets_num * sizeof(svt_cuda_pack_packet_t));
+
+    /* Phase 5: packet_size_gcli_raw_bytes[packets_num], frame-constant RAW
+     * GCLI sub-packet size, matches Pi.c's precinct_info_t::packet_size_gcli_raw_bytes
+     * computation (gcli_width*4 bits per band in the packet, byte-aligned).
+     * Uses the NORMAL-row geometry already enforced above. */
+    ctx->h_packet_size_gcli_raw_bytes = (uint32_t*)malloc((pi->packets_num ? pi->packets_num : 1) * sizeof(uint32_t));
+    ctx->h_packets_exist = (uint8_t*)malloc(pi->packets_num ? pi->packets_num : 1);
+    for (uint32_t p = 0; p < pi->packets_num; p++) {
+        uint32_t raw_bits = 0;
+        uint8_t exists = 0;
+        for (uint32_t bidx = pi->packets[p].band_start; bidx < pi->packets[p].band_stop; bidx++) {
+            const SvtCudaFrameBandGeom& g = bands[bidx];
+            if (g.band_id == BAND_NOT_EXIST)
+                continue;
+            if (pi->packets[p].line_idx < g.height_lines_num) {
+                raw_bits += g.gcli_width * 4;
+                exists = 1;
+            }
+        }
+        ctx->h_packet_size_gcli_raw_bytes[p] = (raw_bits + 7) >> 3;
+        /* Frame-constant: packet existence depends only on packet/band
+         * geometry (line_idx vs. height_lines_num), which is precinct-
+         * independent under this context's NORMAL-only scope -- see
+         * k_pack_precinct_frame()'s has_band check, which this replicates. */
+        ctx->h_packets_exist[p] = exists;
+    }
     return 0;
 }
 
@@ -345,7 +396,9 @@ static uint32_t efc_compute_budget_bytes(uint32_t bands_num, const SvtCudaFrameB
                                          uint8_t coding_significance,
                                          uint32_t packets_num, const svt_cuda_pack_packet_t* packets,
                                          std::vector<uint32_t>& pack_gcli_bits, std::vector<uint32_t>& pack_sig_bits,
-                                         std::vector<uint32_t>& pack_data_bits, std::vector<uint8_t>* pack_method_out) {
+                                         std::vector<uint32_t>& pack_data_bits, std::vector<uint8_t>* pack_method_out,
+                                         uint8_t coding_raw_enable, const uint32_t* packet_size_gcli_raw_bytes,
+                                         std::vector<uint8_t>* packet_raw_out) {
     for (uint32_t b = 0; b < bands_num; b++) {
         const SvtCudaFrameBandGeom& bi = bands[b];
         if (bi.band_id == BAND_NOT_EXIST) {
@@ -410,7 +463,24 @@ static uint32_t efc_compute_budget_bytes(uint32_t bands_num, const SvtCudaFrameB
             }
         }
         precinct_size_bytes += efc_bits_to_bytes(data_bits);
-        precinct_size_bytes += efc_bits_to_bytes(gcli_bits) + efc_bits_to_bytes(sig_bits);
+
+        uint32_t gcli_bytes = efc_bits_to_bytes(gcli_bits);
+        uint32_t sig_bytes = efc_bits_to_bytes(sig_bits);
+        /* Matches RateControl.c:766-780 precinct_get_budget_bytes(): RAW
+         * coding replaces the significance+gcli sub-packets whenever it is
+         * enabled AND smaller. This decision feeds the byte total that the
+         * RC binary search itself compares against budget_bytes, not just
+         * the final packing pass -- see plan file Phase 5 notes. */
+        if (coding_raw_enable && (sig_bytes + gcli_bytes > packet_size_gcli_raw_bytes[p])) {
+            precinct_size_bytes += packet_size_gcli_raw_bytes[p];
+            if (packet_raw_out)
+                (*packet_raw_out)[p] = 1;
+        }
+        else {
+            precinct_size_bytes += gcli_bytes + sig_bytes;
+            if (packet_raw_out)
+                (*packet_raw_out)[p] = 0;
+        }
     }
     return precinct_size_bytes;
 }
@@ -533,11 +603,11 @@ __device__ __forceinline__ void efc_add_padding_bytes(EfcWriter* bw, uint32_t nb
     }
     bw->offset += nbytes;
 }
-__device__ __forceinline__ void efc_write_packet_header(EfcWriter* bw, uint32_t long_hdr, uint64_t data_size_bytes,
-                                                         uint64_t bitplane_count_size_bytes) {
+__device__ __forceinline__ void efc_write_packet_header(EfcWriter* bw, uint32_t long_hdr, uint8_t raw_coding,
+                                                         uint64_t data_size_bytes, uint64_t bitplane_count_size_bytes) {
     uint8_t* mem = bw->mem + bw->offset;
     const uint64_t sign_size_bytes = 0;
-    mem[0] = 0;
+    mem[0] = (uint8_t)(raw_coding << 7);
     if (long_hdr) {
         mem[0] |= (uint8_t)((data_size_bytes >> 13) & 0x7F);
         mem[1] = (uint8_t)((data_size_bytes >> 5) & 0xFF);
@@ -572,6 +642,14 @@ __device__ __forceinline__ void efc_vlc_encode_simple(EfcWriter* bw, int32_t nbi
 __device__ void efc_pack_significance(EfcWriter* bw, uint8_t gtli, const uint8_t* sig_max, uint32_t width) {
     for (uint32_t i = 0; i < width; i++) {
         efc_write_1_bit(bw, sig_max[i] <= gtli ? 1 : 0);
+    }
+}
+/* Phase 5: RAW GCLI sub-packet, matches PackPrecinct.c's pack_bitplane_count_raw()
+ * -- each band's raw (un-truncated) per-group bitplane count is written as a
+ * fixed 4-bit nibble, reusing the existing efc_write_4_bits_align4() writer. */
+__device__ void efc_pack_bitplane_count_raw(EfcWriter* bw, const uint8_t* bitplane, uint32_t width) {
+    for (uint32_t i = 0; i < width; i++) {
+        efc_write_4_bits_align4(bw, bitplane[i]);
     }
 }
 __device__ void efc_pack_bitplane_count_no_significance(EfcWriter* bw, const uint8_t* bitplane, uint32_t width, int8_t gtli) {
@@ -647,6 +725,91 @@ __device__ void efc_pack_data(EfcWriter* bw, const uint16_t* buf, uint32_t width
     }
 }
 
+/* Packs ONE packet (significance + GCLI + data sub-packets) into `bw`, which
+ * the caller has already positioned at this packet's precomputed byte
+ * offset. Split out of k_pack_precinct_frame() so it can be called
+ * independently per packet-thread (see that kernel's comment). Returns 0 on
+ * success, matching the *out_error codes the caller used to set inline
+ * (1=significance length mismatch, 2=GCLI length mismatch, 3=data length
+ * mismatch). */
+__device__ int efc_pack_one_packet(EfcWriter* bw, const SvtCudaFrameBandGeom* bands, uint16_t* const* pyramid_ptrs,
+                                   const uint32_t* comp_stride, const uint8_t* gcli_frame, const uint8_t* sig_frame,
+                                   const uint8_t* gtli, const uint8_t* pack_method, uint32_t precinct_idx,
+                                   uint8_t use_short_header, uint32_t band_start, uint32_t band_stop, uint32_t line_idx,
+                                   uint8_t is_raw, uint32_t psd_p, uint32_t psg_p, uint32_t pss_p) {
+    efc_write_packet_header(bw, !use_short_header, is_raw, psd_p, psg_p);
+    efc_align_byte(bw);
+
+    uint32_t bits_last = efc_used_bits(bw);
+    if (!is_raw) {
+        /* RAW packets have no significance sub-packet at all (PackPrecinct.c:316-343). */
+        for (uint32_t bidx = band_start; bidx < band_stop; bidx++) {
+            const SvtCudaFrameBandGeom& bi = bands[bidx];
+            if (bi.band_id == BAND_NOT_EXIST || line_idx >= bi.height_lines_num)
+                continue;
+            if (pack_method[bidx] == 1) {
+                uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
+                const uint8_t* sig = sig_frame + bi.sig_offset + (size_t)abs_row * bi.significance_width;
+                efc_pack_significance(bw, gtli[bidx], sig, bi.significance_width);
+            }
+        }
+    }
+    efc_align_byte(bw);
+    if (efc_used_bits(bw) - bits_last != pss_p * 8) {
+        return 1;
+    }
+
+    bits_last = efc_used_bits(bw);
+    for (uint32_t bidx = band_start; bidx < band_stop; bidx++) {
+        const SvtCudaFrameBandGeom& bi = bands[bidx];
+        if (bi.band_id == BAND_NOT_EXIST || line_idx >= bi.height_lines_num)
+            continue;
+        uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
+        const uint8_t* gcli = gcli_frame + bi.gcli_offset + (size_t)abs_row * bi.gcli_width;
+        if (is_raw) {
+            efc_pack_bitplane_count_raw(bw, gcli, bi.gcli_width);
+        }
+        else if (pack_method[bidx] == 1) {
+            const uint8_t* sig = sig_frame + bi.sig_offset + (size_t)abs_row * bi.significance_width;
+            efc_pack_bitplane_count_significance(bw, gcli, bi.gcli_width, gtli[bidx], sig, EFC_SIGNIFICANCE_GROUP_SIZE);
+        }
+        else {
+            efc_pack_bitplane_count_no_significance(bw, gcli, bi.gcli_width, gtli[bidx]);
+        }
+    }
+    efc_align_byte(bw);
+    if (efc_used_bits(bw) - bits_last != psg_p * 8) {
+        return 2;
+    }
+
+    bits_last = efc_used_bits(bw);
+    for (uint32_t bidx = band_start; bidx < band_stop; bidx++) {
+        const SvtCudaFrameBandGeom& bi = bands[bidx];
+        if (bi.band_id == BAND_NOT_EXIST || line_idx >= bi.height_lines_num)
+            continue;
+        uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
+        const uint8_t* gcli = gcli_frame + bi.gcli_offset + (size_t)abs_row * bi.gcli_width;
+        const uint16_t* coeff = pyramid_ptrs[bi.comp_id] + (size_t)(bi.y + abs_row) * comp_stride[bi.comp_id] + bi.x;
+        efc_pack_data(bw, coeff, bi.width, gcli, gtli[bidx]);
+    }
+    efc_align_byte(bw);
+    if (efc_used_bits(bw) - bits_last != psd_p * 8) {
+        return 3;
+    }
+    return 0;
+}
+
+/* 2026-08-26 Pack-parallelization trial: was "1 precinct = 1 block, 1
+ * thread" (fully serial within a precinct); SVT_CUDA_PROFILE-based profiling
+ * on real 4K images confirmed this to be the dominant cost (~13ms/22ms warm)
+ * -- see PortingStrategy.txt section 12 correction. Each packet within a
+ * precinct is now independent (sub-packets are already byte-aligned, and
+ * each packet's byte size/offset is precomputed on the host before this
+ * kernel launches -- see FrameContextCuda.cuh's h_packet_offset comment), so
+ * packets are distributed across the block's threads with no cross-thread
+ * synchronization needed. Thread 0 additionally writes the (small,
+ * fixed-size) precinct header/band-flags and the trailing padding, since
+ * those occupy byte ranges the packet threads never touch. */
 __global__ void k_pack_precinct_frame(const SvtCudaFrameBandGeom* bands, uint32_t bands_num_all, uint32_t bands_num_exists,
                                       uint16_t* const* pyramid_ptrs, const uint32_t* comp_stride, const uint8_t* gcli_frame,
                                       const uint8_t* sig_frame, const uint8_t* gtli_all, const uint8_t* pack_method_all,
@@ -654,37 +817,61 @@ __global__ void k_pack_precinct_frame(const SvtCudaFrameBandGeom* bands, uint32_
                                       const uint8_t* quantization_all, const uint8_t* refinement_all,
                                       const uint32_t* total_bytes_all, const uint32_t* padding_bytes_all,
                                       const uint32_t* out_offset_all, const uint32_t* psd_all, const uint32_t* psg_all,
-                                      const uint32_t* pss_all, uint8_t* out_buffer, int* out_error) {
+                                      const uint32_t* pss_all, const uint8_t* packet_methods_raw_all,
+                                      const uint32_t* packet_offset_all, uint8_t* out_buffer, int* out_error) {
     uint32_t precinct_idx = blockIdx.x;
     const uint8_t* gtli = gtli_all + (size_t)precinct_idx * bands_num_all;
     const uint8_t* pack_method = pack_method_all + (size_t)precinct_idx * bands_num_all;
     const uint32_t* psd = psd_all + (size_t)precinct_idx * packets_num;
     const uint32_t* psg = psg_all + (size_t)precinct_idx * packets_num;
     const uint32_t* pss = pss_all + (size_t)precinct_idx * packets_num;
-    uint32_t pack_total_bytes = total_bytes_all[precinct_idx];
-    uint32_t pack_padding_bytes = padding_bytes_all[precinct_idx];
-
-    EfcWriter bw;
-    bw.mem = out_buffer + out_offset_all[precinct_idx];
-    bw.offset = 0;
-    bw.bits_used = 0;
+    const uint8_t* packet_methods_raw = packet_methods_raw_all + (size_t)precinct_idx * packets_num;
+    const uint32_t* packet_offset = packet_offset_all + (size_t)precinct_idx * packets_num;
+    uint8_t* precinct_mem = out_buffer + out_offset_all[precinct_idx];
 
     uint32_t header_len_bytes = (EFC_PRECINCT_HEADER_SIZE_BYTES * 8 + 2 * bands_num_exists + 7) / 8;
-    uint32_t packet_bytes_size = pack_total_bytes - header_len_bytes;
-    efc_write_n_bits(&bw, packet_bytes_size, 24);
-    efc_write_n_bits(&bw, quantization_all[precinct_idx], 8);
-    efc_write_n_bits(&bw, refinement_all[precinct_idx], 8);
 
-    for (uint32_t band = 0; band < bands_num_all; band++) {
-        if (bands[band].band_id == BAND_NOT_EXIST) {
-            continue;
+    if (threadIdx.x == 0) {
+        uint32_t pack_total_bytes = total_bytes_all[precinct_idx];
+        uint32_t pack_padding_bytes = padding_bytes_all[precinct_idx];
+        uint32_t packet_bytes_size = pack_total_bytes - header_len_bytes;
+
+        EfcWriter bw;
+        bw.mem = precinct_mem;
+        bw.offset = 0;
+        bw.bits_used = 0;
+        efc_write_n_bits(&bw, packet_bytes_size, 24);
+        efc_write_n_bits(&bw, quantization_all[precinct_idx], 8);
+        efc_write_n_bits(&bw, refinement_all[precinct_idx], 8);
+        for (uint32_t band = 0; band < bands_num_all; band++) {
+            if (bands[band].band_id == BAND_NOT_EXIST) {
+                continue;
+            }
+            uint8_t type_Dpb = pack_method[band] ? EFC_CODING_MODE_FLAG_SIGNIFICANCE : 0;
+            efc_write_n_bits(&bw, type_Dpb, 2);
         }
-        uint8_t type_Dpb = pack_method[band] ? EFC_CODING_MODE_FLAG_SIGNIFICANCE : 0;
-        efc_write_n_bits(&bw, type_Dpb, 2);
-    }
-    efc_align_byte(&bw);
+        efc_align_byte(&bw);
+        /* bw.offset must now equal header_len_bytes -- guaranteed by
+         * construction (EFC_PRECINCT_HEADER_SIZE_BYTES*8 + 2 bits/existing-band,
+         * byte-aligned), not re-checked here since packet threads below don't
+         * depend on this write completing (they use the precomputed offset). */
 
-    for (uint32_t p = 0; p < packets_num; p++) {
+        if (pack_padding_bytes) {
+            /* packet_bytes_size (the 24-bit header field) covers everything
+             * after the precinct header INCLUDING the trailing padding
+             * (that's what makes the precinct's on-disk size match its CBR
+             * budget) -- so padding starts packet_bytes_size - pack_padding_bytes
+             * bytes in, i.e. right after the last actual packet's data, NOT
+             * at packet_bytes_size itself. */
+            EfcWriter pad_bw;
+            pad_bw.mem = precinct_mem + header_len_bytes + (packet_bytes_size - pack_padding_bytes);
+            pad_bw.offset = 0;
+            pad_bw.bits_used = 0;
+            efc_add_padding_bytes(&pad_bw, pack_padding_bytes);
+        }
+    }
+
+    for (uint32_t p = threadIdx.x; p < packets_num; p += blockDim.x) {
         int has_band = 0;
         for (uint32_t bidx = packets[p].band_start; bidx < packets[p].band_stop; bidx++) {
             if (bands[bidx].band_id != BAND_NOT_EXIST && packets[p].line_idx < bands[bidx].height_lines_num) {
@@ -696,69 +883,17 @@ __global__ void k_pack_precinct_frame(const SvtCudaFrameBandGeom* bands, uint32_
             continue;
         }
 
-        efc_write_packet_header(&bw, !use_short_header, psd[p], psg[p]);
-        efc_align_byte(&bw);
+        EfcWriter bw;
+        bw.mem = precinct_mem + header_len_bytes + packet_offset[p];
+        bw.offset = 0;
+        bw.bits_used = 0;
 
-        uint32_t bits_last = efc_used_bits(&bw);
-        for (uint32_t bidx = packets[p].band_start; bidx < packets[p].band_stop; bidx++) {
-            const SvtCudaFrameBandGeom& bi = bands[bidx];
-            uint32_t line = packets[p].line_idx;
-            if (bi.band_id == BAND_NOT_EXIST || line >= bi.height_lines_num)
-                continue;
-            if (pack_method[bidx] == 1) {
-                uint32_t abs_row = precinct_idx * bi.height_lines_num + line;
-                const uint8_t* sig = sig_frame + bi.sig_offset + (size_t)abs_row * bi.significance_width;
-                efc_pack_significance(&bw, gtli[bidx], sig, bi.significance_width);
-            }
+        int err = efc_pack_one_packet(&bw, bands, pyramid_ptrs, comp_stride, gcli_frame, sig_frame, gtli, pack_method,
+                                      precinct_idx, use_short_header, packets[p].band_start, packets[p].band_stop,
+                                      packets[p].line_idx, packet_methods_raw[p], psd[p], psg[p], pss[p]);
+        if (err != 0) {
+            atomicExch(out_error, err);
         }
-        efc_align_byte(&bw);
-        if (efc_used_bits(&bw) - bits_last != pss[p] * 8) {
-            *out_error = 1;
-            return;
-        }
-
-        bits_last = efc_used_bits(&bw);
-        for (uint32_t bidx = packets[p].band_start; bidx < packets[p].band_stop; bidx++) {
-            const SvtCudaFrameBandGeom& bi = bands[bidx];
-            uint32_t line = packets[p].line_idx;
-            if (bi.band_id == BAND_NOT_EXIST || line >= bi.height_lines_num)
-                continue;
-            uint32_t abs_row = precinct_idx * bi.height_lines_num + line;
-            const uint8_t* gcli = gcli_frame + bi.gcli_offset + (size_t)abs_row * bi.gcli_width;
-            if (pack_method[bidx] == 1) {
-                const uint8_t* sig = sig_frame + bi.sig_offset + (size_t)abs_row * bi.significance_width;
-                efc_pack_bitplane_count_significance(&bw, gcli, bi.gcli_width, gtli[bidx], sig, EFC_SIGNIFICANCE_GROUP_SIZE);
-            }
-            else {
-                efc_pack_bitplane_count_no_significance(&bw, gcli, bi.gcli_width, gtli[bidx]);
-            }
-        }
-        efc_align_byte(&bw);
-        if (efc_used_bits(&bw) - bits_last != psg[p] * 8) {
-            *out_error = 2;
-            return;
-        }
-
-        bits_last = efc_used_bits(&bw);
-        for (uint32_t bidx = packets[p].band_start; bidx < packets[p].band_stop; bidx++) {
-            const SvtCudaFrameBandGeom& bi = bands[bidx];
-            uint32_t line = packets[p].line_idx;
-            if (bi.band_id == BAND_NOT_EXIST || line >= bi.height_lines_num)
-                continue;
-            uint32_t abs_row = precinct_idx * bi.height_lines_num + line;
-            const uint8_t* gcli = gcli_frame + bi.gcli_offset + (size_t)abs_row * bi.gcli_width;
-            const uint16_t* coeff = pyramid_ptrs[bi.comp_id] + (size_t)(bi.y + abs_row) * comp_stride[bi.comp_id] + bi.x;
-            efc_pack_data(&bw, coeff, bi.width, gcli, gtli[bidx]);
-        }
-        efc_align_byte(&bw);
-        if (efc_used_bits(&bw) - bits_last != psd[p] * 8) {
-            *out_error = 3;
-            return;
-        }
-    }
-
-    if (pack_padding_bytes) {
-        efc_add_padding_bytes(&bw, pack_padding_bytes);
     }
 }
 
@@ -800,9 +935,9 @@ static int efc_graph2_needs_recapture(const SvtCudaFrameContext* ctx, uint8_t qu
 
 int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[], const uint32_t in_stride[],
                           uint32_t decom_h, uint32_t decom_v, uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq,
-                          uint8_t quant_type, uint8_t use_short_header, uint8_t coding_significance, uint32_t max_quantization,
-                          uint32_t max_refinement, const uint32_t* precinct_budget_bytes, uint32_t bands_num_exists,
-                          uint32_t packets_exist_num, uint8_t* out_buffer, uint32_t* out_used_bytes) {
+                          uint8_t quant_type, uint8_t use_short_header, uint8_t coding_significance, uint8_t coding_raw_enable,
+                          uint32_t max_quantization, uint32_t max_refinement, const uint32_t* precinct_budget_bytes,
+                          uint32_t bands_num_exists, uint32_t packets_exist_num, uint8_t* out_buffer, uint32_t* out_used_bytes) {
     uint32_t bands_num_all = ctx->bands_num_all;
     uint32_t precincts_num = ctx->precincts_num;
     uint32_t packets_num = ctx->packets_num;
@@ -898,9 +1033,15 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
         }
     }
 
+    EfcProfileTimer efc_prof_timer;
+    bool efc_prof = efc_profile_enabled();
+    if (efc_prof)
+        efc_prof_timer.start();
     if ((cerr = cudaGraphLaunch(ctx->graph1_exec, ctx->stream)) == cudaSuccess) {
         cerr = cudaStreamSynchronize(ctx->stream); /* ctx->h_lut must be ready before the host RC loop reads it */
     }
+    if (efc_prof)
+        fprintf(stderr, "[svt_cuda_profile] graph1 (DWT+NLT+GC+RC-LUT) launch+sync: %.3f ms\n", efc_prof_timer.stop_ms());
     if (cerr != cudaSuccess) {
         return -(int)cerr;
     }
@@ -921,6 +1062,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
     std::vector<uint8_t> gtli(bands_num_all);
     std::vector<uint32_t> pgb(bands_num_all * 4), psb(bands_num_all * 4), pdb(bands_num_all * 4);
 
+    if (efc_prof)
+        efc_prof_timer.start();
     for (uint32_t pr = 0; pr < precincts_num; pr++) {
         uint32_t budget_bytes = precinct_budget_bytes[pr];
         if (budget_bytes <= headers_bytes) {
@@ -952,7 +1095,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
                 continue;
             }
             uint32_t total = efc_compute_budget_bytes(bands_num_all, ctx->h_bands, lut, ctx->lut_row_offset, pr, gtli.data(),
-                                                      coding_significance, packets_num, h_packets, pgb, psb, pdb, NULL);
+                                                      coding_significance, packets_num, h_packets, pgb, psb, pdb, NULL,
+                                                      coding_raw_enable, ctx->h_packet_size_gcli_raw_bytes, NULL);
             step = (total > budget_to_data_bytes) ? EFC_STEP_TOO_SMALL : EFC_STEP_TOO_BIG;
         }
         if (!found_q) {
@@ -983,7 +1127,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
                 continue;
             }
             uint32_t total = efc_compute_budget_bytes(bands_num_all, ctx->h_bands, lut, ctx->lut_row_offset, pr, gtli.data(),
-                                                      coding_significance, packets_num, h_packets, pgb, psb, pdb, NULL);
+                                                      coding_significance, packets_num, h_packets, pgb, psb, pdb, NULL,
+                                                      coding_raw_enable, ctx->h_packet_size_gcli_raw_bytes, NULL);
             step = (total <= budget_to_data_bytes) ? EFC_STEP_TOO_SMALL : EFC_STEP_TOO_BIG;
         }
         if (!found_r) {
@@ -991,9 +1136,11 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
         }
 
         std::vector<uint8_t> pack_method(bands_num_all, 0);
+        std::vector<uint8_t> packet_raw(packets_num, 0);
         efc_compute_all_truncation(bands_num_all, ctx->h_bands, quantization, refinement, gtli.data());
         uint32_t data_bytes = efc_compute_budget_bytes(bands_num_all, ctx->h_bands, lut, ctx->lut_row_offset, pr, gtli.data(),
-                                                       coding_significance, packets_num, h_packets, pgb, psb, pdb, &pack_method);
+                                                       coding_significance, packets_num, h_packets, pgb, psb, pdb, &pack_method,
+                                                       coding_raw_enable, ctx->h_packet_size_gcli_raw_bytes, &packet_raw);
 
         memcpy(&ctx->h_gtli[(size_t)pr * bands_num_all], gtli.data(), bands_num_all);
         memcpy(&ctx->h_pack_method[(size_t)pr * bands_num_all], pack_method.data(), bands_num_all);
@@ -1019,10 +1166,40 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
                 }
             }
             ctx->h_psd[(size_t)pr * packets_num + p] = efc_bits_to_bytes(data_bits);
-            ctx->h_psg[(size_t)pr * packets_num + p] = efc_bits_to_bytes(gcli_bits);
-            ctx->h_pss[(size_t)pr * packets_num + p] = efc_bits_to_bytes(sig_bits);
+            /* Apply the same RAW-vs-normal decision efc_compute_budget_bytes()
+             * already made for this packet (packet_raw[p]), so the per-packet
+             * byte breakdown used by the header writer / pack kernel stays
+             * consistent with the totals used for the RC budget check above. */
+            ctx->h_packet_methods_raw[(size_t)pr * packets_num + p] = packet_raw[p];
+            if (packet_raw[p]) {
+                ctx->h_psg[(size_t)pr * packets_num + p] = ctx->h_packet_size_gcli_raw_bytes[p];
+                ctx->h_pss[(size_t)pr * packets_num + p] = 0;
+            }
+            else {
+                ctx->h_psg[(size_t)pr * packets_num + p] = efc_bits_to_bytes(gcli_bits);
+                ctx->h_pss[(size_t)pr * packets_num + p] = efc_bits_to_bytes(sig_bits);
+            }
+        }
+
+        /* Pack-parallelization: each existing packet's byte offset relative
+         * to the end of the (fixed-size) precinct header, so k_pack_precinct_frame()
+         * can hand each packet to an independent thread with no cross-thread
+         * synchronization (see FrameContextCuda.cuh's h_packet_offset comment). */
+        {
+            uint32_t running_offset = 0;
+            uint32_t pack_header_bytes = pack_header_bits >> 3;
+            for (uint32_t p = 0; p < packets_num; p++) {
+                ctx->h_packet_offset[(size_t)pr * packets_num + p] = running_offset;
+                if (ctx->h_packets_exist[p]) {
+                    running_offset += pack_header_bytes + ctx->h_psd[(size_t)pr * packets_num + p] +
+                        ctx->h_psg[(size_t)pr * packets_num + p] + ctx->h_pss[(size_t)pr * packets_num + p];
+                }
+            }
         }
     }
+    if (efc_prof)
+        fprintf(stderr, "[svt_cuda_profile] host RC binary search (%u precincts, %u packets/precinct, %u bands/precinct): %.3f ms\n",
+                precincts_num, packets_num, bands_num_all, efc_prof_timer.stop_ms());
 
     uint32_t running = 0;
     for (uint32_t pr = 0; pr < precincts_num; pr++) {
@@ -1055,6 +1232,12 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
         cerr = cudaMemcpyAsync(ctx->d_gtli, ctx->h_gtli, pb_bytes, cudaMemcpyHostToDevice, ctx->stream);
         if (cerr == cudaSuccess)
             cerr = cudaMemcpyAsync(ctx->d_pack_method, ctx->h_pack_method, pb_bytes, cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(
+                ctx->d_packet_methods_raw, ctx->h_packet_methods_raw, pp_elems, cudaMemcpyHostToDevice, ctx->stream);
+        if (cerr == cudaSuccess)
+            cerr = cudaMemcpyAsync(ctx->d_packet_offset, ctx->h_packet_offset, pp_elems * sizeof(uint32_t),
+                                   cudaMemcpyHostToDevice, ctx->stream);
         if (cerr == cudaSuccess)
             cerr = cudaMemcpyAsync(
                 ctx->d_packet_size_data_bytes, ctx->h_psd, pp_elems * sizeof(uint32_t), cudaMemcpyHostToDevice, ctx->stream);
@@ -1096,12 +1279,18 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
         }
 
         if (cerr == cudaSuccess) {
-            k_pack_precinct_frame<<<precincts_num, 1, 0, ctx->stream>>>(
+            /* Pack-parallelization trial: one warp per precinct block, each
+             * thread taking packets round-robin (packets_num is typically
+             * well under 32 -- see plan file -- so most threads handle at
+             * most one packet). */
+            const uint32_t PACK_THREADS_PER_BLOCK = 32;
+            k_pack_precinct_frame<<<precincts_num, PACK_THREADS_PER_BLOCK, 0, ctx->stream>>>(
                 ctx->d_bands, bands_num_all, bands_num_exists, ctx->d_pyramid_ptrs, ctx->d_comp_stride, ctx->d_gcli_frame,
                 ctx->d_sig_frame, ctx->d_gtli, ctx->d_pack_method, packets_num, (const svt_cuda_pack_packet_t*)ctx->d_packets,
                 use_short_header, ctx->d_precinct_quantization, ctx->d_precinct_refinement, ctx->d_precinct_total_bytes,
                 ctx->d_precinct_padding_bytes, ctx->d_precinct_out_offset, ctx->d_packet_size_data_bytes,
-                ctx->d_packet_size_gcli_bytes, ctx->d_packet_size_significance_bytes, ctx->d_pack_out, ctx->d_error);
+                ctx->d_packet_size_gcli_bytes, ctx->d_packet_size_significance_bytes, ctx->d_packet_methods_raw,
+                ctx->d_packet_offset, ctx->d_pack_out, ctx->d_error);
 
             cerr = cudaMemcpyAsync(ctx->h_error, ctx->d_error, sizeof(int), cudaMemcpyDeviceToHost, ctx->stream);
         }
@@ -1124,6 +1313,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
         ctx->cap_use_short_header = use_short_header;
     }
 
+    if (efc_prof)
+        efc_prof_timer.start();
     if ((cerr = cudaGraphLaunch(ctx->graph2_exec, ctx->stream)) == cudaSuccess) {
         /* Final bitstream size varies with frame content, so this D2H copy
          * (unlike everything above) is not captured -- its destination is
@@ -1133,6 +1324,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
     if (cerr == cudaSuccess) {
         cerr = cudaStreamSynchronize(ctx->stream);
     }
+    if (efc_prof)
+        fprintf(stderr, "[svt_cuda_profile] graph2 (quantize+pack) launch+sync: %.3f ms\n", efc_prof_timer.stop_ms());
     if (cerr != cudaSuccess) {
         return -(int)cerr;
     }

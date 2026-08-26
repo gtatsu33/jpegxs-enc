@@ -64,6 +64,84 @@ static void deinterleave_rgb(const PixelImage_t *image, svt_jpeg_xs_image_buffer
     }
 }
 
+/* Planar YUV422 8-bit input is already laid out the way the encoder's planar
+ * buffers expect (Y plane, then U, then V; component strides equal component
+ * widths for non-packed formats -- see ImageBuffer.c), so this is a flat
+ * per-plane memcpy, unlike deinterleave_rgb() above. */
+static void copy_yuv422p8_planes(const PixelImage_t *image, svt_jpeg_xs_image_buffer_t *dst) {
+    const uint8_t *src = image->data;
+    const size_t y_bytes = (size_t)image->width * image->height;
+    const size_t c_bytes = (size_t)(image->width / 2) * image->height;
+    memcpy(dst->data_yuv[0], src, y_bytes);
+    memcpy(dst->data_yuv[1], src + y_bytes, c_bytes);
+    memcpy(dst->data_yuv[2], src + y_bytes + c_bytes, c_bytes);
+}
+
+/* Raw YUV has no header, so width/height are parsed from the filename's
+ * "_WIDTHxHEIGHT_" token (matches the naming already used by every raw file
+ * in testdata/, e.g. test_1920x1080_yuv422p8.yuv). Returns 0 on success. */
+static int parse_wxh_from_filename(const char *path, uint32_t *out_w, uint32_t *out_h) {
+    const char *base = path;
+    for (const char *p = path; *p; p++) {
+        if (*p == '/' || *p == '\\') {
+            base = p + 1;
+        }
+    }
+    for (const char *p = base; *p; p++) {
+        if (*p < '0' || *p > '9') {
+            continue;
+        }
+        const char *digit_start = p;
+        while (*p >= '0' && *p <= '9') {
+            p++;
+        }
+        if (*p != 'x' && *p != 'X') {
+            continue;
+        }
+        const char *w_end = p;
+        const char *h_start = p + 1;
+        const char *q = h_start;
+        while (*q >= '0' && *q <= '9') {
+            q++;
+        }
+        if (q == h_start) {
+            continue;
+        }
+        /* Require a non-digit (typically '_') immediately before/after so a
+         * bit-depth-like "10" inside a longer number isn't mistaken for one
+         * half of the pair. */
+        int before_ok = (digit_start == base) || (*(digit_start - 1) < '0' || *(digit_start - 1) > '9');
+        if (!before_ok) {
+            p = q - 1;
+            continue;
+        }
+        *out_w = (uint32_t)strtoul(digit_start, NULL, 10);
+        *out_h = (uint32_t)strtoul(h_start, NULL, 10);
+        (void)w_end;
+        return 0;
+    }
+    return -1;
+}
+
+static int has_suffix_ci(const char *s, const char *suffix) {
+    size_t s_len = strlen(s), suf_len = strlen(suffix);
+    if (suf_len > s_len) {
+        return 0;
+    }
+    const char *tail = s + (s_len - suf_len);
+    for (size_t i = 0; i < suf_len; i++) {
+        char a = tail[i], b = suffix[i];
+        if (a >= 'A' && a <= 'Z')
+            a = (char)(a - 'A' + 'a');
+        if (b >= 'A' && b <= 'Z')
+            b = (char)(b - 'A' + 'a');
+        if (a != b) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 /* Replicates RC_CBR_PER_PRECINCT's (no move-padding) per-precinct byte-budget
  * split -- an even distribution of the slice budget, remainder handed to the
  * first `left` precincts. Matches
@@ -78,8 +156,10 @@ static void compute_precinct_budgets(uint32_t prec_num, uint32_t slice_budget_by
 
 int32_t main(int32_t argc, char *argv[]) {
     if (argc < 3) {
-        printf("Usage: %s <input.ppm> <output_prefix> [bpp]\n", argv[0]);
+        printf("Usage: %s <input.ppm|input.yuv> <output_prefix> [bpp]\n", argv[0]);
         printf("  input.ppm      binary PPM (Netpbm \"P6\", interleaved RGB), maxval 1-65535\n");
+        printf("  input.yuv      raw headerless planar YUV422 8-bit (\"yuv422p\"), one frame;\n");
+        printf("                 width/height parsed from a \"_WIDTHxHEIGHT_\" token in the filename\n");
         printf("  output_prefix  bitstreams are written to <output_prefix>.cpu.jxs / .cuda.jxs\n");
         printf("  bpp            optional target bits-per-pixel, integer or decimal (e.g. 0.5, 3, 3.75). Default: 3\n");
         printf("Scope: single slice, RC_CBR_PER_PRECINCT, source_height evenly divisible by\n");
@@ -90,9 +170,24 @@ int32_t main(int32_t argc, char *argv[]) {
     const char *output_prefix = argv[2];
     const char *bpp_arg = argc > 3 ? argv[3] : "3";
 
+    int is_yuv = has_suffix_ci(input_file_name, ".yuv");
+
     PixelImage_t image;
-    if (pixel_image_load_ppm(input_file_name, &image) != 0) {
-        return -1;
+    if (is_yuv) {
+        uint32_t yuv_w = 0, yuv_h = 0;
+        if (parse_wxh_from_filename(input_file_name, &yuv_w, &yuv_h) != 0) {
+            printf("Could not find a \"_WIDTHxHEIGHT_\" token in the filename to size the raw yuv input: %s\n",
+                   input_file_name);
+            return -1;
+        }
+        if (pixel_image_load_yuv422p8(input_file_name, yuv_w, yuv_h, &image) != 0) {
+            return -1;
+        }
+    }
+    else {
+        if (pixel_image_load_ppm(input_file_name, &image) != 0) {
+            return -1;
+        }
     }
 
     svt_jpeg_xs_encoder_api_t enc;
@@ -105,7 +200,7 @@ int32_t main(int32_t argc, char *argv[]) {
     enc.source_width = image.width;
     enc.source_height = image.height;
     enc.input_bit_depth = (uint8_t)image.bit_depth;
-    enc.colour_format = COLOUR_FORMAT_PLANAR_YUV444_OR_RGB;
+    enc.colour_format = is_yuv ? COLOUR_FORMAT_PLANAR_YUV422 : COLOUR_FORMAT_PLANAR_YUV444_OR_RGB;
     parse_bpp_arg(bpp_arg, &enc.bpp_numerator, &enc.bpp_denominator);
     enc.threads_num = 1; /* single-threaded CPU reference, matching the timing methodology in PortingStrategy.txt section 10 */
     enc.slice_height = image.height;         /* Phase 4a scope: single slice */
@@ -134,7 +229,12 @@ int32_t main(int32_t argc, char *argv[]) {
         pixel_image_free(&image);
         return SvtJxsErrorInsufficientResources;
     }
-    deinterleave_rgb(&image, in_buf);
+    if (is_yuv) {
+        copy_yuv422p8_planes(&image, in_buf);
+    }
+    else {
+        deinterleave_rgb(&image, in_buf);
+    }
     pixel_image_free(&image);
 
     svt_jpeg_xs_bitstream_buffer_t out_buf;
@@ -261,6 +361,15 @@ int32_t main(int32_t argc, char *argv[]) {
         return SvtJxsErrorInsufficientResources;
     }
 
+    /* Two calls on the SAME ctx: the 1st necessarily captures graph1+graph2
+     * (hundreds of kernel-launch nodes recorded + cudaGraphInstantiate), a
+     * one-time cost folded into that call's measured time; the 2nd is a pure
+     * cudaGraphLaunch replay. This matches tests/Benchmark's own methodology
+     * (see PortingStrategy.txt section 10, "capture excluded as warm-up") --
+     * a single-call measurement here would silently report a cold-start
+     * number, not the steady-state per-frame cost the 16ms/33ms targets are
+     * about. The 2nd call's output is what gets written out / bit-exact
+     * checked below. */
     get_current_time(&t0s, &t0m);
     rc = svt_cuda_encode_frame(&ctx,
                                 in_planes,
@@ -273,6 +382,7 @@ int32_t main(int32_t argc, char *argv[]) {
                                 (uint8_t)enc_common->picture_header_dynamic.hdr_Qpih,
                                 (uint8_t)pi->use_short_header,
                                 (uint8_t)enc_common->coding_significance,
+                                (uint8_t)enc_common->picture_header_dynamic.hdr_Rl,
                                 enc_common->pi_enc.max_quantization,
                                 enc_common->pi_enc.max_refinement,
                                 precinct_budgets,
@@ -281,6 +391,31 @@ int32_t main(int32_t argc, char *argv[]) {
                                 precinct_data,
                                 &precinct_used_bytes);
     get_current_time(&t1s, &t1m);
+    double cuda_cold_ms = compute_elapsed_time_in_ms(t0s, t0m, t1s, t1m);
+
+    if (rc == 0) {
+        get_current_time(&t0s, &t0m);
+        rc = svt_cuda_encode_frame(&ctx,
+                                    in_planes,
+                                    in_stride,
+                                    pi->decom_h,
+                                    pi->decom_v,
+                                    enc.input_bit_depth,
+                                    enc_common->picture_header_dynamic.hdr_Bw,
+                                    enc_common->picture_header_dynamic.hdr_Fq,
+                                    (uint8_t)enc_common->picture_header_dynamic.hdr_Qpih,
+                                    (uint8_t)pi->use_short_header,
+                                    (uint8_t)enc_common->coding_significance,
+                                    (uint8_t)enc_common->picture_header_dynamic.hdr_Rl,
+                                    enc_common->pi_enc.max_quantization,
+                                    enc_common->pi_enc.max_refinement,
+                                    precinct_budgets,
+                                    pi->bands_num_exists,
+                                    (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num,
+                                    precinct_data,
+                                    &precinct_used_bytes);
+        get_current_time(&t1s, &t1m);
+    }
     double cuda_ms = compute_elapsed_time_in_ms(t0s, t0m, t1s, t1m);
 
     if (rc != 0) {
@@ -340,15 +475,20 @@ int32_t main(int32_t argc, char *argv[]) {
 
     int bit_exact = (offset == out_buf.used_size) && (memcmp(cuda_bitstream, out_buf.buffer, offset) == 0);
 
-    printf("Encoded %s (%ux%u, %u-bit RGB, bpp=%u/%u)\n",
+    printf("Encoded %s (%ux%u, %u-bit %s, bpp=%u/%u)\n",
            input_file_name,
            enc.source_width,
            enc.source_height,
            enc.input_bit_depth,
+           is_yuv ? "YUV422" : "RGB",
            enc.bpp_numerator,
            enc.bpp_denominator);
     printf("  CPU  (%s): %u bytes, %.3f ms\n", cpu_path, out_buf.used_size, cpu_ms);
-    printf("  CUDA (%s): %u bytes, %.3f ms\n", cuda_path, offset, cuda_ms);
+    printf("  CUDA (%s): %u bytes, %.3f ms warm (2nd call, graph replay only) / %.3f ms cold (1st call, incl. graph capture)\n",
+           cuda_path,
+           offset,
+           cuda_ms,
+           cuda_cold_ms);
     printf("  bit-exact match: %s\n", bit_exact ? "YES" : "NO (mismatch!)");
     if (cuda_ms > 0.0) {
         printf("  speedup (CPU/CUDA): %.2fx\n", cpu_ms / cuda_ms);

@@ -141,6 +141,72 @@ int pixel_image_load_ppm(const char* path, PixelImage_t* out_image) {
     return 0;
 }
 
+int pixel_image_load_yuv422p8(const char* path, uint32_t width, uint32_t height, PixelImage_t* out_image) {
+    memset(out_image, 0, sizeof(*out_image));
+
+    if (width == 0 || height == 0 || (width % 2) != 0) {
+        fprintf(stderr, "PixelIo: invalid width/height for yuv422p8 (%ux%u, width must be even)\n", width, height);
+        return -1;
+    }
+
+    FILE* f = NULL;
+#ifdef _WIN32
+    fopen_s(&f, path, "rb");
+#else
+    f = fopen(path, "rb");
+#endif
+    if (!f) {
+        fprintf(stderr, "PixelIo: cannot open file: %s\n", path);
+        return -1;
+    }
+
+    const size_t y_bytes = (size_t)width * height;
+    const size_t c_bytes = (size_t)(width / 2) * height;
+    const size_t total_bytes = y_bytes + 2 * c_bytes;
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fprintf(stderr, "PixelIo: seek failed on %s\n", path);
+        fclose(f);
+        return -1;
+    }
+    long file_size = ftell(f);
+    if (file_size < 0 || (size_t)file_size != total_bytes) {
+        fprintf(stderr,
+                "PixelIo: %s size %ld doesn't match %ux%u yuv422p8 (expected %zu bytes)\n",
+                path,
+                file_size,
+                width,
+                height,
+                total_bytes);
+        fclose(f);
+        return -1;
+    }
+    rewind(f);
+
+    uint8_t* data = (uint8_t*)malloc(total_bytes);
+    if (!data) {
+        fprintf(stderr, "PixelIo: out of memory loading %s\n", path);
+        fclose(f);
+        return -1;
+    }
+    if (fread(data, 1, total_bytes, f) != total_bytes) {
+        fprintf(stderr, "PixelIo: short read on %s\n", path);
+        free(data);
+        fclose(f);
+        return -1;
+    }
+    fclose(f);
+
+    out_image->width = width;
+    out_image->height = height;
+    out_image->channels_num = 3;
+    out_image->bit_depth = 8;
+    out_image->bytes_per_sample = 1;
+    out_image->layout = PIXEL_LAYOUT_YUV422_PLANAR_8BIT;
+    out_image->data = data;
+    return 0;
+}
+
 void pixel_image_free(PixelImage_t* image) {
     if (image && image->data) {
         stbi_image_free(image->data);

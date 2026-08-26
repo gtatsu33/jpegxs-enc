@@ -1,0 +1,1 @@
+C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\Codec\ENCODER_CODEC.dir\Release\ENCODER_CODEC.lib

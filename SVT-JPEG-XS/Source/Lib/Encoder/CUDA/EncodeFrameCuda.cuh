@@ -14,7 +14,9 @@
  * threaded pipeline (EncHandle.c) per the project's "separate library"
  * integration policy -- see PortingStrategy.txt section 7/8 and the Phase 4
  * plan. Fixed scope inherited from Phase 2/3: VPRED disabled, Signs
- * handling = OFF, hdr_Rl = 0, Deadzone quantization, Significance enabled.
+ * handling = OFF, Deadzone quantization, Significance enabled.
+ * Phase 5: RAW-mode packet coding (hdr_Rl) is supported, controlled per call
+ * via svt_cuda_encode_frame()'s coding_raw_enable argument.
  * Additionally (Phase 4a scope constraint): the image height must be evenly
  * divisible by pi->precinct_height, i.e. every precinct row has the same
  * (NORMAL) band geometry -- true for the primary 4K/decom_v=2 target
@@ -47,6 +49,11 @@ int svt_cuda_frame_context_create_from_pi(SvtCudaFrameContext* ctx, const pi_t* 
  * input_bit_depth, hdr_Bw, hdr_Fq: matches NltCuda/DwtCuda's parameters.
  * quant_type: 0 = QUANT_TYPE_DEADZONE, 1 = QUANT_TYPE_UNIFORM.
  * use_short_header: matches pi_t::use_short_header.
+ * coding_raw_enable: matches picture_header_dynamic_t::hdr_Rl. When set, a
+ *   packet's significance+GCLI sub-packets are replaced by a fixed-size RAW
+ *   bitplane-count sub-packet whenever that is smaller, matching
+ *   RateControl.c's precinct_get_budget_bytes()/PackPrecinct.c's RAW coding
+ *   path (see PortingStrategy.txt section 8 Phase 5).
  * precinct_budget_bytes: [precincts_num], host array, the per-precinct byte
  *   budget (headers+data) the caller has already computed (e.g. replicating
  *   RC_CBR_PER_PRECINCT_MOVE_PADDING's slice/precinct distribution formula,
@@ -67,9 +74,9 @@ int svt_cuda_frame_context_create_from_pi(SvtCudaFrameContext* ctx, const pi_t* 
  */
 int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[], const uint32_t in_stride[],
                           uint32_t decom_h, uint32_t decom_v, uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq,
-                          uint8_t quant_type, uint8_t use_short_header, uint8_t coding_significance, uint32_t max_quantization,
-                          uint32_t max_refinement, const uint32_t* precinct_budget_bytes, uint32_t bands_num_exists,
-                          uint32_t packets_exist_num, uint8_t* out_buffer, uint32_t* out_used_bytes);
+                          uint8_t quant_type, uint8_t use_short_header, uint8_t coding_significance, uint8_t coding_raw_enable,
+                          uint32_t max_quantization, uint32_t max_refinement, const uint32_t* precinct_budget_bytes,
+                          uint32_t bands_num_exists, uint32_t packets_exist_num, uint8_t* out_buffer, uint32_t* out_used_bytes);
 
 #ifdef __cplusplus
 }

@@ -166,7 +166,8 @@ static void run_real_crop444(const char* ppm_path, uint32_t crop_x, uint32_t cro
     rc = svt_cuda_encode_frame(&ctx, in_planes, in_stride, pi->decom_h, pi->decom_v, bit_depth,
                                enc_common->picture_header_dynamic.hdr_Bw, enc_common->picture_header_dynamic.hdr_Fq,
                                (uint8_t)enc_common->picture_header_dynamic.hdr_Qpih, (uint8_t)pi->use_short_header,
-                               (uint8_t)enc_common->coding_significance, enc_common->pi_enc.max_quantization,
+                               (uint8_t)enc_common->coding_significance,
+                               (uint8_t)enc_common->picture_header_dynamic.hdr_Rl, enc_common->pi_enc.max_quantization,
                                enc_common->pi_enc.max_refinement, precinct_budgets.data(), pi->bands_num_exists,
                                (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, precinct_data.data(),
                                &precinct_used_bytes);
@@ -213,7 +214,11 @@ static void run_real_crop444(const char* ppm_path, uint32_t crop_x, uint32_t cro
     free(out_buf.buffer);
 }
 
-static const char* kRealPpm = "C:\\Users\\0000108885\\codes\\jpegxs-enc\\testdata\\SOMED_TUM\\TUM_3840x2160_204_S-BD1_01_T02_00250_gma.ppm";
+/* Was hardcoded to a different machine's user-specific absolute path
+ * (testdata/SOMED_TUM/..., never committed to this repo); repointed at the
+ * repo-relative TESTDATA_DIR (see tests/UnitTests/CMakeLists.txt) chart image
+ * -- same 3840x2160/10-bit real-image shape this scratch test needs. */
+static const char* kRealPpm = TESTDATA_DIR "/chart_color_3840x2160_R1.321_B1.975_CL50.0_00010_out_srz_u82.ppm";
 
 TEST(BisectRealCrop444Cuda, crop_0_0_256x64) {
     run_real_crop444(kRealPpm, 0, 0, 256, 64);

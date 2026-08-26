@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\EncDec.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\ImageBuffer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Pi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\SvtLog.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\SvtUtility.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Threads\SvtMalloc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Threads\SvtThreads.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Threads\SystemResourceManager.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\common_dsp_rtcd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Codestream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Definitions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\EncDec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Pi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\SvtLog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\SvtType.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\SvtUtility.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Threads\SvtMalloc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Threads\SvtObject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Threads\SvtThreads.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\Threads\SystemResourceManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\common_dsp_rtcd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Common\Codec\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{599DE128-EFAB-31CE-A298-71691661C392}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{25B413E2-FFA6-3998-B112-4C7C8EB3AFC3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

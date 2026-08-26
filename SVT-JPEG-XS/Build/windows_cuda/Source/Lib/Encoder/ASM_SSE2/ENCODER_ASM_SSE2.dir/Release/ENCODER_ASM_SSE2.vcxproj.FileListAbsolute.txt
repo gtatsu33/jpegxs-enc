@@ -1,0 +1,1 @@
+C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_SSE2\ENCODER_ASM_SSE2.dir\Release\ENCODER_ASM_SSE2.lib

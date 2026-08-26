@@ -127,7 +127,8 @@ static void run_small444(uint32_t width, uint32_t height) {
     rc = svt_cuda_encode_frame(&ctx, in_planes, in_stride, pi->decom_h, pi->decom_v, bit_depth,
                                enc_common->picture_header_dynamic.hdr_Bw, enc_common->picture_header_dynamic.hdr_Fq,
                                (uint8_t)enc_common->picture_header_dynamic.hdr_Qpih, (uint8_t)pi->use_short_header,
-                               (uint8_t)enc_common->coding_significance, enc_common->pi_enc.max_quantization,
+                               (uint8_t)enc_common->coding_significance,
+                               (uint8_t)enc_common->picture_header_dynamic.hdr_Rl, enc_common->pi_enc.max_quantization,
                                enc_common->pi_enc.max_refinement, precinct_budgets.data(), pi->bands_num_exists,
                                (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, precinct_data.data(),
                                &precinct_used_bytes);

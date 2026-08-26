@@ -279,10 +279,47 @@ precinctバイト長など)をダンプし、CUDAカーネルの出力とビッ�
            必要な実装: (1) CUDA側での`pack_bitplane_count_raw()`相当のRAW
            格納カーネル、(2) `packet_methods_raw[]`相当の判定をホスト側RC/LUT
            経路に反映しRAW選択時のパケットサイズ見積もりを一致させること、
-           (3) `k_pack_precinct_frame`へのRAW選択結果の橋渡し。現時点では
-           未着手。当面の回避策として、`SampleEncoderCuda`(セクション12)は
-           `coding_raw_disable=1`(`hdr_Rl=0`)を設定し、CUDA移植が実際に
-           検証済みのスコープ内で動作するようにする。
+           (3) `k_pack_precinct_frame`へのRAW選択結果の橋渡し。
+
+           [2026-08-26 計画策定完了] 詳細実装計画を計画ファイル(セクション11参照、
+           `ticklish-cooking-cascade.md`のPhase5節)に記載した。対象はフレーム一括
+           バッチ経路(`EncodeFrameCuda.cu`、Phase4で`SampleEncoderCuda`が実際に使う
+           経路)のみとし、旧1precinct単位API(`RcQuantCuda.cu`/`PackCuda.cu`)への
+           RAW実装は対象外(既存18テストの無改造・無回帰を維持するため)。
+           `packet_size_gcli_raw_bytes`はband幾何から決まる純粋に幾何学的な値
+           (Pi.c確認済み)であり、CUDA側フレーム一括経路は既にNORMAL精度均一
+           ジオメトリのみをスコープとしているため、precinct種別を問わない
+           `[packets_num]`固定配列1本で足りることを確認済み。RAW選択判定は
+           RC二分探索のコスト評価そのものに影響する(後付けの最終packing分岐では
+           ない)ため、`efc_compute_budget_bytes()`(二分探索から3箇所呼ばれる)側に
+           判定を追加する設計とした。データサブパケットの符号化はRAW/通常どちらでも
+           不変、RAW用ニブル書き込みは既存の`efc_write_4_bits_align4()`をそのまま
+           再利用できる。詳細な改修箇所(関数名・行番号)・検証方法は計画ファイル参照。
+           未着手(ユーザー確認待ち)。当面の回避策として、`SampleEncoderCuda`
+           (セクション12)は`coding_raw_disable=1`(`hdr_Rl=0`)を設定し、CUDA移植が
+           実際に検証済みのスコープ内で動作するようにする案があったが、Phase5実装
+           完了後はこの回避策は不要になる想定。
+
+           [2026-08-26 テストデータ確定・ユーザー確認済み] 検証用の実画像には
+           `testdata/chart_color_3840x2160_R1.321_B1.975_CL50.0_00010_out_srz_u82.ppm`
+           (P6, 3840x2160, maxval=1023の10bit、カラーチャート含み低エントロピー領域が
+           多くRAWモードが実際に選択される見込み)を使う。既存の`TestBisectRealCrop444Cuda.cc`
+           等が特定マシンの絶対パスをハードコードしている点は移植性がないアンチパターンと
+           判断し踏襲しない。新規ユニットテスト(`TestEncodeFrameCuda.cc`にPPM読み込みケースを
+           追加)は`tests/UnitTests/CMakeLists.txt`にCMake経由の`TESTDATA_DIR`マクロを追加して
+           相対的にリポジトリ内の`testdata/`を参照する方式とする。詳細は計画ファイル
+           (セクション11)のPhase5「検証方法」節参照。
+
+           [Phase5完了] 実装完了・検証済み。新規テスト`EncodeFrameCuda.real_ppm_chart_color_
+           raw_mode_matches_real_cpu_pipeline`はbit-exactでpass、全回帰テストは12068件中
+           12066件パス(失敗ゼロ、既存スキップ2件のみ)。`SampleEncoderCuda`で`chart_color`
+           実画像を`coding_raw_disable`回避策なし(実際の`hdr_Rl`値をそのまま使用)で実行し、
+           CPU版・CUDA版がbit-exact一致することを確認した(受け入れ基準達成、Phase5完了)。
+           副産物として、既存のbisectionスクラッチテスト5件が「別マシンの絶対パスハードコード
+           +参照先ファイル自体が本リポジトリに未存在」「テストコード側の`coding_raw_enable`
+           仮置き漏れ」の2つの独立した問題で失敗していたことを発見・修正した(詳細は計画ファイル
+           Phase5完了サマリ参照)。Phase 4・5を通じてCUDA移植は当初の16ms/33ms目標を達成し
+           完了。
 
   [実装上の追加発見] 実際のパイプライン構造は上記の8段階のような独立ステージ
   分割ではなく、「Init(1スレッド) -> Dwt(CPU_PROFILE_CPU時のみ、component単位の
@@ -639,3 +676,88 @@ Phaseごとの実装手順の詳細は上記の計画ファイル側を参照す
       実際に検証済みのスコープ内に収める形で対応する方針を提案する
       (未実装・未検証、ユーザー確認後に実装しbit-exact再検証する)。RAWモード
       自体のCUDA実装は将来のPhase 5候補として記録する。
+
+  [2026-08-26 testdata実行速度プロファイル取得・YUV422p8ローダー追加(ユーザー要望)]
+  Phase5完了後、`testdata/`配下3ファイル(`chart_color_*.ppm`, `eval_fantom1_*.ppm`,
+  `test_1920x1080_yuv422p8.yuv`)のCPU/CUDA実行速度プロファイルを依頼された。PPM2ファイルは
+  `SvtJpegxsSampleEncoderCuda`で即座に計測できたが、`test_1920x1080_yuv422p8.yuv`は生YUV422p8
+  形式(ヘッダ無し、Y+U+V平面連続配置、確認済みファイルサイズ4,147,200バイト=1920x1080x2)で
+  あり、`SampleEncoderCuda`のPPM専用スコープ(本セクション上部参照)では読み込めず、かつ
+  コードベース内どこからも参照されていない孤立ファイルであることが判明した。ユーザーに
+  3案(PPMのみ報告/既存EncAppでCPUのみ計測/SampleEncoderCudaにYUVローダー追加)を提示し、
+  「SampleEncoderCudaにYUVローダーを追加」を選択された。`PixelIo.h/.c`にYUV422p8専用ローダー
+  を追加し、`SampleEncoderCuda`側で拡張子`.yuv`を検出してPPM経路と分岐する設計とする
+  (幅・高さはファイル名の`_WIDTHxHEIGHT_`パターンから取得、CLI引数追加なし)。YUV420/444・
+  8bit以外のビット深度は対象外。詳細は計画ファイル(セクション11)の該当節参照。
+
+  [実装完了・実測結果] `SvtJpegxsSampleEncoderCuda`によるtestdata 3ファイルの実測
+  (bpp=3/1、RTX 5070 Ti、3ファイルともbit-exact一致):
+    chart_color_*.ppm (3840x2160, 10bit RGB):        CPU 59.0ms / CUDA 23.0ms (2.57x)
+    eval_fantom1_*.ppm (3840x2160, 10bit RGB):        CPU 61.0ms / CUDA 25.0ms (2.44x)
+    test_1920x1080_yuv422p8.yuv (1920x1080, 8bit):    CPU 14.0ms / CUDA  9.0ms (1.56x)
+  1920x1080はPhase4a/5のスコープ制約(precinct行の均等分割)を満たし、エラー無く動作した。
+  詳細は計画ファイル(セクション11)の当該節参照。
+
+  [2026-08-26 重大な訂正: Phase4cの「16ms達成」は人工的な固定値データでの測定であり、
+  実画像では未達] 上記実測値(4K実画像で warm 22ms)がPhase4c完了時にセクション10へ記載した
+  「~7ms、16ms理想目標達成」から大きく乖離していることをユーザーに指摘され、原因を調査した。
+
+  判明した事実: `tests/Benchmark/main.cpp`の`bench_phase4_full_frame()`
+  (Phase4c完了報告時の「~7ms」の直接の測定元)は、入力画像として
+  `memset(in_buf->data_yuv[c], 0x55, ...)` で**全ピクセルが同一値の完全に平坦な画像**を
+  使用していた(`bench_phase4_recapture_behavior()`も同様)。ランダムノイズですらなく、
+  最も圧縮しやすい(DWT高周波係数がほぼ全てゼロになる)人工的な条件であり、実画像の
+  エントロピー特性を一切反映していなかった。この事実はPhase4cの完了報告時点では
+  認識されておらず、「16ms理想目標を大きなマージンで達成」という結論はこの人工データに
+  限定して成立するものだった。
+
+  `SvtCudaFrameContext`内に一時的なサブフェーズ計測(環境変数`SVT_CUDA_PROFILE=1`で
+  有効化、`EncodeFrameCuda.cu`、既存の計測に影響しないよう本番経路には計測オーバーヘッド
+  無し)を追加し、`chart_color`実画像(4K)のウォーム状態(2回目呼び出し)の内訳を実測した:
+    graph1 (DWT+NLT+GC+RC-LUT構築)     7.58 ms  (Phase4cの~7msとほぼ一致)
+    ホスト側RC二分探索 (540 precinct)   1.15 ms  (無視できる水準)
+    graph2 (量子化+Pack)              13.29 ms  (**全体の約60%、最大のボトルネック**)
+    合計                             ~22 ms
+
+  結論: graph1(DWTタイル化含む)はPhase4cの想定どおりの性能を実画像でも発揮している。
+  ボトルネックは`graph2`側、実質的には`k_pack_precinct_frame`(`EncodeFrameCuda.cu`)である。
+  このカーネルはPhase3設計時点(セクション5参照)から「1 precinct = 1 block, 1 thread」という
+  precinct内完全逐次の構造のままであり、Phase4のバッチ化は「540回の個別launchを1回のlaunch
+  (540ブロック)にまとめた」だけで、各ブロック内の逐次ビットストリーム書き込み自体は
+  並列化されていない。全ピクセル固定値データではDWT係数がほぼゼロになりこの逐次ループが
+  実質空回りするため、この弱点が一度も計測面で表面化していなかった。
+
+  **33ms現実目標は実画像でも達成しているが(22ms < 33ms)、16ms理想目標は実画像では未達
+  (22ms > 16ms)。これは新たな不具合ではなく、既存の「1 precinct = 1 thread」という
+  Phase3以来の既知の設計制約(セクション5・8参照)が、これまで測定条件の問題で
+  一度も負荷として現れていなかっただけである。**
+
+  [2026-08-26 最適化トライアル: packet単位Pack並列化 — bit-exactだが高速化効果なし]
+  上記ボトルネック解消を目指し、`k_pack_precinct_frame`を「1 precinct=1 block, 1 thread」
+  から「1 precinct=1 block, 32 threads、packet単位で分散」へ変更するトライアルを実施した
+  (`FrameContextCuda.cuh/.cu`に`h_packet_offset`/`h_packets_exist`追加、各packetの
+  precinct内バイトオフセットをホスト側RC二分探索ループでprefix sum事前計算し、
+  スレッド間同期無しで独立書き込みできる設計)。
+
+  実装直後、bit-exact検証で31件中9件が失敗(precinct末尾のpadding開始位置を`packet_bytes_size`
+  <padding込みの値>そのものとして誤用したバグ。正しくは`packet_bytes_size - pack_padding_bytes`
+  の位置。1スレッドに戻しても再現したため純粋なロジックバグと判明、並列化由来の競合ではな
+  かった)。修正後、`*Cuda*`テスト31/31 pass、全回帰12068件中12066件pass(無回帰)。
+
+  **しかし速度計測の結果、高速化効果はほぼ確認できなかった**(chart_color実画像、
+  graph2(量子化+Pack)、修正前13.29ms→修正後12.5〜13.8ms、実質横ばい)。原因を
+  `SVT_CUDA_PROFILE=1`出力(packets_num/bands_num_allを追加表示)で確認した結果、
+  4K・decom_h=5/decom_v=2設定では`packets_num=10`, `bands_num_all=30`
+  (precinctあたり平均3 band/packet)であり、DWT分解によりband幅が
+  level-1(~1920)からdecom最深部相当(~60)まで桁違いに異なるため、precinct内の
+  ワークロードがpacket間で極端に不均衡(ごく少数のpacketに処理時間の大半が集中)。
+  CUDAのSIMT実行モデルではwarp全体の完了が最も仕事量の多いスレッドに律速されるため、
+  packet単位という粒度では実効的な並列化にならなかったと推測される(実測に基づく事実
+  ここまで、原因の仮説はここから未検証)。
+
+  **ユーザー判断: 今回のセッションはここで終了し、次フェーズ(band/coefficient-group単位の
+  より細かい並列化、Section 5で当初「最難関」と記録した2パス方式)に向けた詳細な引き継ぎ
+  ドキュメントを整備した上で完了とする。**今回実装したpacket単位並列化コード自体は
+  bit-exact・無回帰のため維持する(オフセット事前計算という設計パターンは次フェーズの
+  土台として再利用可能)。詳細な技術的引き継ぎ内容(推奨アプローチ・実装ステップ・教訓)は
+  計画ファイル(セクション11)の「次フェーズ(Phase 6候補)への引き継ぎメモ」参照。

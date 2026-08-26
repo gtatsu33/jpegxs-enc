@@ -139,7 +139,10 @@ static bool read_ppm_component0(const char* path, uint32_t crop_w, uint32_t crop
 TEST(BisectRealDwtCuda, real_component0_full_width_matches_cpu) {
     setup_encoder_rtcd_internal(CPU_FLAGS_ALL);
 
-    const char* path = "C:\\Users\\0000108885\\codes\\jpegxs-enc\\testdata\\SOMED_TUM\\TUM_3840x2160_204_S-BD1_01_T02_00250_gma.ppm";
+    /* Was hardcoded to a different machine's user-specific absolute path
+     * (testdata/SOMED_TUM/..., never committed to this repo); repointed at
+     * the repo-relative TESTDATA_DIR (see tests/UnitTests/CMakeLists.txt). */
+    const char* path = TESTDATA_DIR "/chart_color_3840x2160_R1.321_B1.975_CL50.0_00010_out_srz_u82.ppm";
     const uint32_t width = 3840, height = 64;
     const uint32_t decom_h = 5, decom_v = 2;
     const uint8_t input_bit_depth = 10;

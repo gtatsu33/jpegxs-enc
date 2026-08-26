@@ -1,0 +1,1 @@
+C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Decoder\ASM_AVX512\DECODER_ASM_AVX512.dir\Release\DECODER_ASM_AVX512.lib

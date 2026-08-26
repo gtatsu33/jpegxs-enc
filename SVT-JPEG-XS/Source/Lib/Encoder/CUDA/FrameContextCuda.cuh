@@ -95,6 +95,34 @@ typedef struct SvtCudaFrameContext {
     void* d_packets;  /* svt_cuda_pack_packet_t[packets_num], see PackCuda.cuh */
     void* h_packets;  /* persistent host mirror (avoids a D2H download every encode call) */
 
+    /* --- Phase 5: RAW-mode packet coding. packet_size_gcli_raw_bytes is a
+     * frame-constant, purely-geometric per-packet value (see Pi.c's
+     * precinct_info_t::packet_size_gcli_raw_bytes / PortingStrategy.txt
+     * section 8 Phase 5) -- computed once here since this context's geometry
+     * is constrained to uniform NORMAL precinct rows (see
+     * svt_cuda_frame_context_create_from_pi()), so a single [packets_num]
+     * array (no precinct-type dimension) is sufficient. */
+    uint32_t* h_packet_size_gcli_raw_bytes; /* [packets_num], host-only */
+    uint8_t* d_packet_methods_raw; /* [precincts_num * packets_num], RAW-selection flag per (precinct,packet) */
+    uint8_t* h_packet_methods_raw; /* [precincts_num * packets_num], pinned host mirror (H2D source inside graph2) */
+
+    /* --- Pack-parallelization trial (2026-08-26, see PortingStrategy.txt
+     * section 12 correction / plan file "16ms未達の原因調査" section):
+     * k_pack_precinct_frame() used to run 1 precinct = 1 block = 1 thread,
+     * fully serial within a precinct -- confirmed via SVT_CUDA_PROFILE
+     * profiling to be the dominant real-image cost (~13ms/22ms warm on 4K).
+     * packets_exist[] is a frame-constant (packet existence depends only on
+     * packet/band geometry, not per-precinct content, under this context's
+     * NORMAL-only scope) computed once; packet_offset[] is the per-precinct,
+     * per-packet byte offset (relative to the end of the precinct header)
+     * that lets each packet be written by an independent thread with no
+     * cross-thread synchronization, since sub-packets are already
+     * byte-aligned and each packet's byte size is already known from the
+     * host RC search before the pack kernel launches. */
+    uint8_t* h_packets_exist;    /* [packets_num], host-only, frame-constant */
+    uint32_t* d_packet_offset;   /* [precincts_num * packets_num] */
+    uint32_t* h_packet_offset;   /* [precincts_num * packets_num], pinned host mirror (H2D source inside graph2) */
+
     /* =====================================================================
      * Phase 4b-2: CUDA Graph support. Two graphs bracket the host-side RC
      * binary search (which must stay off-graph -- see plan file Phase 4b-2):

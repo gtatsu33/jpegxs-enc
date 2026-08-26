@@ -66,9 +66,14 @@ target_compile_definitions(SvtJpegxsUnitTests PRIVATE BUILD_TESTING)
 
 if(ENABLE_CUDA)
     file(GLOB cuda_test_files "*Cuda.cc")
-    target_sources(SvtJpegxsUnitTests PRIVATE ${cuda_test_files} $<TARGET_OBJECTS:ENCODER_CUDA>)
-    target_include_directories(SvtJpegxsUnitTests PRIVATE ${PROJECT_SOURCE_DIR}/Source/Lib/Encoder/CUDA)
-    target_compile_definitions(SvtJpegxsUnitTests PRIVATE SVT_ENABLE_CUDA)
+    target_sources(SvtJpegxsUnitTests PRIVATE ${cuda_test_files} $<TARGET_OBJECTS:ENCODER_CUDA>
+        ${PROJECT_SOURCE_DIR}/Source/App/Common/PixelIo.c)
+    target_include_directories(SvtJpegxsUnitTests PRIVATE
+        ${PROJECT_SOURCE_DIR}/Source/Lib/Encoder/CUDA
+        ${PROJECT_SOURCE_DIR}/Source/App/Common
+        ${PROJECT_SOURCE_DIR}/third_party/stb_image)
+    target_compile_definitions(SvtJpegxsUnitTests PRIVATE SVT_ENABLE_CUDA
+        TESTDATA_DIR="${PROJECT_SOURCE_DIR}/../testdata")
     target_link_libraries(SvtJpegxsUnitTests PRIVATE CUDA::cudart)
 endif()
 

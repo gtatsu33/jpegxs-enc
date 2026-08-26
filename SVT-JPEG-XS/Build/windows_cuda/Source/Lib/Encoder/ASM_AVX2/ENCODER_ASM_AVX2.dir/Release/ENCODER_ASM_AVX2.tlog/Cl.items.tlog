@@ -1,0 +1,4 @@
+C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2\Dwt_AVX2.c;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\Release\Dwt_AVX2.obj
+C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2\NltEnc_avx2.c;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\Release\NltEnc_avx2.obj
+C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2\Quant_avx2.c;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\Release\Quant_avx2.obj
+C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Source\Lib\Encoder\ASM_AVX2\RateControl_avx2.c;C:\Users\gtats\python codes\jpegxs-enc\SVT-JPEG-XS\Build\windows_cuda\Source\Lib\Encoder\ASM_AVX2\ENCODER_ASM_AVX2.dir\Release\RateControl_avx2.obj
