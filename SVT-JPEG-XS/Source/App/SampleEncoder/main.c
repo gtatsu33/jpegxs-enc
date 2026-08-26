@@ -4,104 +4,149 @@
 */
 
 #include <SvtJpegxsEnc.h>
+#include <SvtJpegxsImageBufferTools.h>
+#include "PixelIo.h"
+#include "UtilityApp.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+/* PPM data is interleaved (R,G,B,R,G,B,...); the encoder's planar RGB format
+ * (COLOUR_FORMAT_PLANAR_YUV444_OR_RGB) needs one buffer per channel. */
+static void deinterleave_rgb(const PixelImage_t *image, svt_jpeg_xs_image_buffer_t *dst) {
+    const uint64_t pixels_num = (uint64_t)image->width * image->height;
+    if (image->bytes_per_sample == 1) {
+        const uint8_t *src = image->data;
+        uint8_t *r = (uint8_t *)dst->data_yuv[0];
+        uint8_t *g = (uint8_t *)dst->data_yuv[1];
+        uint8_t *b = (uint8_t *)dst->data_yuv[2];
+        for (uint64_t i = 0; i < pixels_num; i++) {
+            r[i] = src[i * 3 + 0];
+            g[i] = src[i * 3 + 1];
+            b[i] = src[i * 3 + 2];
+        }
+    }
+    else {
+        const uint16_t *src = (const uint16_t *)image->data;
+        uint16_t *r = (uint16_t *)dst->data_yuv[0];
+        uint16_t *g = (uint16_t *)dst->data_yuv[1];
+        uint16_t *b = (uint16_t *)dst->data_yuv[2];
+        for (uint64_t i = 0; i < pixels_num; i++) {
+            r[i] = src[i * 3 + 0];
+            g[i] = src[i * 3 + 1];
+            b[i] = src[i * 3 + 2];
+        }
+    }
+}
 
 int32_t main(int32_t argc, char *argv[]) {
-    if (argc < 2) {
-        printf("Not set input file!\n");
+    if (argc < 3) {
+        printf("Usage: %s <input.ppm> <output.jxs> [bpp]\n", argv[0]);
+        printf("  input.ppm  binary PPM (Netpbm \"P6\", interleaved RGB), maxval 1-65535\n");
+        printf("  bpp        optional target bits-per-pixel, integer or decimal (e.g. 0.5, 3, 3.75). Default: 3\n");
         return -1;
     }
     const char *input_file_name = argv[1];
-    FILE *input_file = NULL;
-#ifdef _WIN32
-    fopen_s(&input_file, input_file_name, "rb");
-#else
-    input_file = fopen(input_file_name, "rb");
-#endif
-    if (input_file == NULL) {
-        printf("Can not open input file: %s!\n", input_file_name);
+    const char *output_file_name = argv[2];
+    const char *bpp_arg = argc > 3 ? argv[3] : "3";
+
+    PixelImage_t image;
+    if (pixel_image_load_ppm(input_file_name, &image) != 0) {
         return -1;
     }
 
     svt_jpeg_xs_encoder_api_t enc;
     SvtJxsErrorType_t err = svt_jpeg_xs_encoder_load_default_parameters(SVT_JPEGXS_API_VER_MAJOR, SVT_JPEGXS_API_VER_MINOR, &enc);
-
     if (err != SvtJxsErrorNone) {
+        pixel_image_free(&image);
         return err;
     }
 
-    enc.source_width = 1920;
-    enc.source_height = 1080;
-    enc.input_bit_depth = 8;
-    enc.colour_format = COLOUR_FORMAT_PLANAR_YUV422;
-    enc.bpp_numerator = 3;
+    enc.source_width = image.width;
+    enc.source_height = image.height;
+    enc.input_bit_depth = (uint8_t)image.bit_depth;
+    enc.colour_format = COLOUR_FORMAT_PLANAR_YUV444_OR_RGB;
+    parse_bpp_arg(bpp_arg, &enc.bpp_numerator, &enc.bpp_denominator);
 
     err = svt_jpeg_xs_encoder_init(SVT_JPEGXS_API_VER_MAJOR, SVT_JPEGXS_API_VER_MINOR, &enc);
     if (err != SvtJxsErrorNone) {
+        pixel_image_free(&image);
         return err;
     }
 
-    //8bit YUV422 frame size:
-    //luma:      width * height * 1 /*bytes per pixel*/
-    //chroma cb: width * height * 1 /*bytes per pixel*/ * 0.5 /*chroma is half the luma size*/
-    //chroma cr: width * height * 1 /*bytes per pixel*/ * 0.5 /*chroma is half the luma size*/
-
-    uint32_t pixel_size = enc.input_bit_depth <= 8 ? 1 : 2;
-    svt_jpeg_xs_image_buffer_t in_buf;
-    in_buf.stride[0] = enc.source_width;
-    in_buf.stride[1] = enc.source_width / 2;
-    in_buf.stride[2] = enc.source_width / 2;
-    for (uint8_t i = 0; i < 3; ++i) {
-        in_buf.alloc_size[i] = in_buf.stride[i] * enc.source_height * pixel_size;
-        in_buf.data_yuv[i] = malloc(in_buf.alloc_size[i]);
-        if (!in_buf.data_yuv[i]) {
-            return SvtJxsErrorInsufficientResources;
-        }
+    svt_jpeg_xs_image_config_t image_config;
+    uint32_t bytes_per_frame = 0;
+    err = svt_jpeg_xs_encoder_get_image_config(
+        SVT_JPEGXS_API_VER_MAJOR, SVT_JPEGXS_API_VER_MINOR, &enc, &image_config, &bytes_per_frame);
+    if (err != SvtJxsErrorNone) {
+        svt_jpeg_xs_encoder_close(&enc);
+        pixel_image_free(&image);
+        return err;
     }
 
+    svt_jpeg_xs_image_buffer_t *in_buf = svt_jpeg_xs_image_buffer_alloc(&image_config);
+    if (!in_buf) {
+        svt_jpeg_xs_encoder_close(&enc);
+        pixel_image_free(&image);
+        return SvtJxsErrorInsufficientResources;
+    }
+    deinterleave_rgb(&image, in_buf);
+    pixel_image_free(&image);
+
     svt_jpeg_xs_bitstream_buffer_t out_buf;
-    uint32_t bitstream_size = (uint32_t)(
-        ((uint64_t)enc.source_width * enc.source_height * enc.bpp_numerator / enc.bpp_denominator + 7) / +8);
-    out_buf.allocation_size = bitstream_size;
+    out_buf.allocation_size = bytes_per_frame * 2 + 4096;
     out_buf.used_size = 0;
     out_buf.buffer = malloc(out_buf.allocation_size);
     if (!out_buf.buffer) {
+        svt_jpeg_xs_image_buffer_free(in_buf);
+        svt_jpeg_xs_encoder_close(&enc);
         return SvtJxsErrorInsufficientResources;
     }
 
-    { //loop over multiple frames
-        //Get YUV 8bit from file or any other location
-        size_t read_size = 0;
-        read_size += fread(in_buf.data_yuv[0], 1, in_buf.alloc_size[0], input_file); //luma
-        read_size += fread(in_buf.data_yuv[1], 1, in_buf.alloc_size[1], input_file); //chroma cb
-        read_size += fread(in_buf.data_yuv[2], 1, in_buf.alloc_size[2], input_file); //chroma cr
-        printf("Read file %s size: %lu!\n", input_file_name, (unsigned long)read_size);
-        fclose(input_file);
+    svt_jpeg_xs_frame_t enc_input;
+    enc_input.bitstream = out_buf;
+    enc_input.image = *in_buf;
+    enc_input.user_prv_ctx_ptr = NULL;
 
-        svt_jpeg_xs_frame_t enc_input;
-        enc_input.bitstream = out_buf;
-        enc_input.image = in_buf;
-        enc_input.user_prv_ctx_ptr = NULL;
-
-        err = svt_jpeg_xs_encoder_send_picture(&enc, &enc_input, 1 /*blocking*/);
-        if (err != SvtJxsErrorNone) {
-            return err;
-        }
-
-        svt_jpeg_xs_frame_t enc_output;
-        err = svt_jpeg_xs_encoder_get_packet(&enc, &enc_output, 1 /*blocking*/);
-        if (err != SvtJxsErrorNone) {
-            return err;
-        }
-        //Store bitstream to file
-        printf("bitstream output: pointer: %p bitstream size: %u\n", enc_output.bitstream.buffer, enc_output.bitstream.used_size);
-        //fwrite(enc_output.bitstream.buffer, 1, enc_output.bitstream.used_size, out_file);
+    err = svt_jpeg_xs_encoder_send_picture(&enc, &enc_input, 1 /*blocking*/);
+    if (err != SvtJxsErrorNone) {
+        free(out_buf.buffer);
+        svt_jpeg_xs_image_buffer_free(in_buf);
+        svt_jpeg_xs_encoder_close(&enc);
+        return err;
     }
 
-    svt_jpeg_xs_encoder_close(&enc);
+    svt_jpeg_xs_frame_t enc_output;
+    err = svt_jpeg_xs_encoder_get_packet(&enc, &enc_output, 1 /*blocking*/);
+    if (err != SvtJxsErrorNone) {
+        free(out_buf.buffer);
+        svt_jpeg_xs_image_buffer_free(in_buf);
+        svt_jpeg_xs_encoder_close(&enc);
+        return err;
+    }
 
+    FILE *output_file = NULL;
+    FOPEN(output_file, output_file_name, "wb");
+    if (!output_file) {
+        printf("Can not open output file: %s!\n", output_file_name);
+        free(out_buf.buffer);
+        svt_jpeg_xs_image_buffer_free(in_buf);
+        svt_jpeg_xs_encoder_close(&enc);
+        return -1;
+    }
+    fwrite(enc_output.bitstream.buffer, 1, enc_output.bitstream.used_size, output_file);
+    fclose(output_file);
+    printf("Encoded %s (%ux%u, %u-bit RGB) -> %s: %u bytes (bpp=%u/%u)\n",
+           input_file_name,
+           enc.source_width,
+           enc.source_height,
+           enc.input_bit_depth,
+           output_file_name,
+           enc_output.bitstream.used_size,
+           enc.bpp_numerator,
+           enc.bpp_denominator);
+
+    svt_jpeg_xs_encoder_close(&enc);
     free(out_buf.buffer);
-    free(in_buf.data_yuv[0]);
-    free(in_buf.data_yuv[1]);
-    free(in_buf.data_yuv[2]);
+    svt_jpeg_xs_image_buffer_free(in_buf);
     return 0;
 }

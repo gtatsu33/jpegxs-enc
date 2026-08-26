@@ -8,10 +8,15 @@
 # Include Subdirectories
 include_directories(
     ${PROJECT_SOURCE_DIR}/Source/API/
+    ${PROJECT_SOURCE_DIR}/Source/App/Common/
+    ${PROJECT_SOURCE_DIR}/third_party/stb_image/
     )
 
 file(GLOB all_files
     "../../API/*.h"
+    "../Common/PixelIo.h"
+    "../Common/PixelIo.c"
+    "../Common/UtilityApp.h"
     "main.c"
 )
 

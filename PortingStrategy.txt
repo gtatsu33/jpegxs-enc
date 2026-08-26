@@ -151,10 +151,24 @@ precinctバイト長など)をダンプし、CUDAカーネルの出力とビッ�
            "CBR per precinct, move padding"モードであることをSampleEncoder実行
            結果で確認済みのため、Phase 2はこのデフォルト構成に対象を絞る。
            VPRED有効時の依存、Signs handling=FULL時の実係数シミュレーション、
-           RAWモードGCLIパッキング比較、スライス共通量子化モードは対象外
-           (デフォルト設定では使われない経路のため)。precinct毎のbudget_bytes
-           配分(move paddingの繰り越しを含む)は計算量が軽いためホスト側で
-           計算し、CUDAカーネルには事前計算済み配列として渡す設計とする。
+           RAWモードGCLIパッキング比較、スライス共通量子化モードは対象外とする。
+           precinct毎のbudget_bytes配分(move paddingの繰り越しを含む)は計算量が
+           軽いためホスト側で計算し、CUDAカーネルには事前計算済み配列として渡す
+           設計とする。
+           [2026-08-26 訂正] 上記「RAWモードは対象外(デフォルト設定では使われない
+           経路のため)」という当初の記述は誤りだったことが後日(セクション12の
+           SampleEncoderCuda実データ検証)判明した。実際には`hdr_Rl`
+           (`coding_raw_disable`が0の場合)は**デフォルトで有効(1)**であり
+           (`EncHandle.c`: `hdr_Rl = config_struct->coding_raw_disable ? 0 : 1`、
+           `coding_raw_disable`のデフォルトは0)、RAWモードパケットは実運用の
+           デフォルト設定下で実際に選択され得る経路である。「対象外」としたこと
+           自体はPhase 2〜4のスコープ判断として維持されている(実装コストと
+           このポーティングの主目的を踏まえた意図的なスコープ限定であり、今回の
+           訂正によって変わらない)が、「デフォルト設定では使われないから対象外」
+           という根拠付けは誤りであり正しくは「デフォルトでは使われる経路だが
+           意図的にスコープ外とした」である。CUDA版を利用する呼び出し側は
+           `coding_raw_disable=1`(`hdr_Rl=0`)を明示的に設定する必要がある
+           (詳細はセクション12参照)。
   Phase 3: ビットストリームパッカーを実装・検証 (最難関)。
            [スコープ確定/計画からの逸脱] 当初セクション5で構想した「band単位の
            ビットレベルscatter書き込みによる精度内並列化」は実装リスクが高いため
@@ -247,6 +261,28 @@ precinctバイト長など)をダンプし、CUDAカーネルの出力とビッ�
            実測: CUDA full-frame 18.43ms→**6.98〜7.20ms**、CPU参照22.51〜23.26ms。
            **16ms理想目標を大きなマージンで達成、33ms現実目標も達成**。Phase 4はこれで
            完了。詳細は計画ファイル(セクション11)のPhase 4c完了サマリを参照。
+
+  Phase 5 (未着手): RAWモードパケット符号化のCUDA実装。
+           [背景・スコープ確定] 2026-08-26、SampleEncoderCuda(セクション12)による
+           実PPM画像での初検証で、CUDA版Pack(`EncodeFrameCuda.cu`の
+           `efc_write_packet_header()`)がRAWモードパケット符号化
+           (`RateControl.c`の`packet_methods_raw[]`判定、`PackPrecinct.c`の
+           `pack_bitplane_count_raw()`に相当する経路)を一切実装しておらず、
+           パケットヘッダのraw_codingビットを常に0固定していることが判明した。
+           hdr_Rl(RAWモード有効フラグ)はデフォルトで有効(1)であり
+           (Phase 2の訂正記載参照)、実画像のようにエントロピーが低い領域を
+           含む入力ではRAWモードが実際に選択されるため、CUDA版はCPU版と
+           bit-exactでなくなる。既存の`*Cuda*`テスト(20/20 pass)はすべて
+           高エントロピーなランダム合成データのみを使っていたためこの欠落を
+           一度も検出していなかった(この経緯自体もPhase 2の訂正記載および
+           セクション12参照)。
+           必要な実装: (1) CUDA側での`pack_bitplane_count_raw()`相当のRAW
+           格納カーネル、(2) `packet_methods_raw[]`相当の判定をホスト側RC/LUT
+           経路に反映しRAW選択時のパケットサイズ見積もりを一致させること、
+           (3) `k_pack_precinct_frame`へのRAW選択結果の橋渡し。現時点では
+           未着手。当面の回避策として、`SampleEncoderCuda`(セクション12)は
+           `coding_raw_disable=1`(`hdr_Rl=0`)を設定し、CUDA移植が実際に
+           検証済みのスコープ内で動作するようにする。
 
   [実装上の追加発見] 実際のパイプライン構造は上記の8段階のような独立ステージ
   分割ではなく、「Init(1スレッド) -> Dwt(CPU_PROFILE_CPU時のみ、component単位の
@@ -420,3 +456,186 @@ Phase毎の詳細な実装計画(対象範囲・データレイアウト・検�
     プロファイリング(4b)]は計画策定完了、4aから着手予定)
 本ファイル(PortingStrategy.txt)は全体戦略・判断根拠・進捗の要約を残す場所とし、
 Phaseごとの実装手順の詳細は上記の計画ファイル側を参照する。
+
+--------------------------------------------------
+12. サンプルアプリケーション (CUDA対応ビルド/非対応ビルド)
+--------------------------------------------------
+目的: Phase 4完了時点のCUDAエンコードパスを、実際に動くサンプルアプリとして
+提供する。「CUDA対応ビルド」「CUDA非対応ビルド」それぞれで得られる体験を
+明確に分けるため、以下の2アプリ構成とする。
+
+  (1) 既存 `Source/App/SampleEncoder` (CPU専用、公開API `SvtJpegxsEnc.h` の
+      みを使用) を、下記(3)のPPM入力に対応させる形で改修する(現状の
+      1920x1080固定・生YUVファイル読み込みをやめる)。ENABLE_CUDAの値に
+      関わらず常にビルドされる。これを「CUDA非対応ビルドのサンプルアプリ」の
+      実体とする(build_cpu、および build_cuda 双方で共通して得られる、素の
+      CPUエンコード体験)。
+      CLI仕様: `SvtJpegxsSampleEncoder <input.ppm> <output.jxs> [bpp]` とする。
+      `bpp`は既存EncApp(`Source/App/EncApp/EncAppConfig.c`の`--bpp`/
+      `set_encoder_bpp()`)と同じ流儀で整数または小数1個の文字列(例: "0.5",
+      "3", "3.75")を受け取り、`enc.bpp_numerator`/`bpp_denominator`へ変換する。
+      この変換ロジックは`set_encoder_bpp()`の複製ではなく、
+      `Source/App/Common/UtilityApp.h`に共通ヘルパー(例:
+      `parse_bpp_arg()`)として切り出し、EncAppからもいずれ差し替え可能な
+      形にする(今回はEncApp側の改修はスコープ外、ヘルパーの新設のみ)。
+      `bpp`省略時は現行のデフォルト値(3/1相当)を用いる。エンコード結果の
+      ビットストリームは(現状コメントアウトされているfwriteを有効化し)
+      必ず`output.jxs`へ書き出す。
+
+  (2) 新規に `Source/App/SampleEncoderCuda` を追加し、「CUDA対応ビルドの
+      サンプルアプリ」とする。CMake上 `if(ENABLE_CUDA)` の中でのみ
+      `add_subdirectory` するため、ENABLE_CUDA=OFFのビルド(build_cpu)には
+      このターゲット自体が存在しない。方針:
+        - (3)のPPMローダーで読み込んだ1枚の静止画を、
+            (a) 公開API経由のCPUリファレンス経路
+                (`svt_jpeg_xs_encoder_send_picture`/`get_packet`)
+            (b) `svt_cuda_encode_frame()` によるGPU経路
+          の両方でエンコードし、出力ビットストリームがbit-exactで一致する
+          ことをその場で検証したうえで、各経路の実行時間を表示する。
+        - CUDAパスは公開APIに配線されていない(セクション7の設計方針どおり)
+          ため、TestEncodeFrameCuda.ccと同じ手法で、CPU側を一度初期化した
+          エンコーダの内部構造体(`svt_jpeg_xs_encoder_api_prv_t` 経由の
+          pi_t/pi_enc_t/frame_header_buffer)からジオメトリとヘッダーを取得
+          し、GPU経路に渡す。このためSampleEncoderCudaはSampleEncoderと異なり
+          Encoderライブラリの内部ヘッダーをインクルードする(公開APIのみの
+          サンプルではない点をREADME/ヘルプ表示で明記する)。
+        - スコープはPhase 4aの制約を踏襲する: VPRED無効・Signs handling=OFF・
+          単一スライス(slice_height=source_height)・RC_CBR_PER_PRECINCT・
+          precinct行が均等分割可能な解像度。制約を満たさない入力(解像度/
+          設定)が指定された場合はエラーメッセージを出して終了し、内部で
+          自動調整は行わない。
+        - 出力: CPU版・CUDA版それぞれのビットストリームを別ファイルへ書き出す。
+      CLI仕様: `SvtJpegxsSampleEncoderCuda <input.ppm> <output_prefix> [bpp]`
+      とする。`bpp`は(1)と同じ`parse_bpp_arg()`ヘルパーで解釈し、省略可能・
+      デフォルトは(1)と同じ3/1相当。CPU参照経路・CUDA経路の両方に同一値を
+      適用する(異なるbppではbit-exact比較の前提が崩れるため)。
+      ビットストリームは `<output_prefix>.cpu.jxs` と
+      `<output_prefix>.cuda.jxs` の2ファイルへそれぞれ書き出す。
+
+  (3) 入力フォーマット: PPM(Netpbm P6, バイナリRGB)のみに対応する。
+      `testdata/SOMED_TUM/`・`testdata/20250221_RAW_SHOOT_rgb_srz_8.2/` 配下に
+      実データ(例: `P6\n3840 2160\n1023\n` ヘッダー、maxval=1023の10bit、
+      サンプルはNetpbm仕様どおりビッグエンディアン2バイト)が既に存在して
+      おり、これを実際の動作確認に用いる。
+        - PPMのデコード自体は `third_party/stb_image/stb_image.h` (v2.30,
+          public domain, 単一ヘッダー) をベンダリングして利用する。ヘッダー
+          トークナイズ(コメント`#`・空白スキップ)、P5/P6判定、幅・高さ・
+          maxvalのパース、8bit/16bitバッファ確保といった定型処理を自前実装
+          せずに済ませるための採用であり、ユーザー指示(既存の汎用ライブラリを
+          積極的に使ってよい)に沿う。
+          [既知問題と対応] 検証の結果、stb_image.h v2.30時点のPNM
+          (PPM/PGM)ローダーは16bit(maxval>255)画像のビッグエンディアン
+          →ネイティブ変換を行わず生バイト列をそのまま返す既知バグを持つ
+          (CVE-2021-42716、上流修正PR nothings/stb#1710は本調査時点で
+          未マージ)。本プロジェクトの実データ(testdata配下、maxval=1023の
+          10bit PPM)はこのバグの影響を直接受け全ピクセル値が化けるため、
+          ベンダリングしたstb_image.hに対し上流PR #1710と同内容の
+          エンディアン修正のみを最小パッチとして適用する(パッチ内容・
+          出典をコメントで明記)。それ以外の改変は行わない。
+          [実装時に判明した追加の既知問題] 当初はコンパイル対象を
+          `STBI_ONLY_PNM`でPNM専用に絞る想定だったが、この定義は内部で
+          `STBI_NO_PNG`/`STBI_NO_PSD`も同時に有効化し、その結果
+          `stbi__convert_format16()`の実体がコンパイル対象から外れる。
+          しかしPNMローダー(`stbi__pnm_load`)の16bit分岐は無条件にこの
+          関数を参照するため、この組み合わせではリンクエラーになる
+          (今回のP6・同一チャンネル数読み込みでは実行時に到達しない分岐だが、
+          リンカはそれを考慮しない。upstream側のONLY_*マクロ間の既知の
+          相互作用問題であり、今回加えたエンディアン修正とは無関係)。
+          対応として`STBI_ONLY_PNM`は指定せずstb_image.hをフルビルドする
+          方針に変更した(コード量は増えるがサンプルアプリの用途では問題
+          にならない)。
+          [ビルド検証] ENABLE_CUDA=OFF(CPU専用)の一時ビルドディレクトリで
+          `SvtJpegxsSampleEncoder`を実際にビルド・リンクし、
+          `testdata/SOMED_TUM/`配下の実PPM(3840x2160、maxval=1023の10bit)
+          を入力してエンコードが成功し、bpp=3設定どおりの
+          3,110,400バイトの出力が得られることを確認した。`SampleEncoderCuda`
+          側はこの検証環境にCUDA Toolkit(nvcc/cuda_runtime.h)が存在しない
+          ため実ビルド検証はできておらず、`Pi.h`/`Encoder.h`等の内部構造体
+          フィールド名をソース照合する静的検証のみで実装した(CUDA Toolkitが
+          利用可能な環境でのビルド確認が今後必要)。
+        - 共通モジュール `Source/App/Common/PixelIo.h/.c` を新規に用意し、
+          stb_image.hの薄いラッパーとして実装する。SampleEncoder/
+          SampleEncoderCuda両方から利用する。P6専用ではなく、将来の
+          フォーマット追加(YUV・Bayer配列・他のビット深度など、ユーザーの
+          将来的な要望)を見据えた汎用的なデータ構造(`PixelImage_t`:
+          width/height/channels_num/bit_depth/サンプルあたりバイト数/
+          インターリーブ有無 等)を中心に設計する。今回実際にワイヤリング
+          するのはP6(3チャンネルRGB、maxval 1〜65535)のみとし、bit_depthは
+          maxvalから算出する(ceil(log2(maxval+1))、encoder が対応する
+          8〜14の範囲外はエラー終了)。P5(グレースケール、将来のBayer/YUV
+          等の土台)はstb_image.h側は既に対応済みのため、`PixelIo`側の
+          対応(colour_format選択など)は拡張時に追加する形とする。
+        - PPMのRGBデータはSampleEncoder/SampleEncoderCuda側でR/G/Bの3平面へ
+          デインターリーブし、`colour_format = COLOUR_FORMAT_PLANAR_YUV444_OR_RGB`
+          (仕様上RGB平面もこの値を使う、セクションSvtJpegxs.hのコメント参照)
+          として渡す。`COLOUR_FORMAT_PACKED_YUV444_OR_RGB`(パック形式)は
+          CPU側がLow Latencyスレッドモード限定・CUDA側は未検証のため今回は
+          使用しない。
+        - source_width/height/input_bit_depthはPPMヘッダーから取得し、
+          コマンドライン引数はPPM入力ファイルパス(および出力先パス)のみと
+          する。
+
+  対象外(スコープ外): PPM以外の画像フォーマット(BMP/PNG/JPEG等)、
+  YUV/Bayer配列入力、動画像連続エンコードのデモ、CUDA Graph再キャプチャ挙動
+  の実演、precinct行が不均等になる汎用解像度への対応。これらは(3)で述べた
+  `PixelIo` の汎用データ構造を土台に、将来必要になった時点で拡張する。
+
+  [CUDA Toolkit導入とビルド検証 (2026-08-26)] この開発機にはNVIDIAドライバ
+  (572.61, CUDA Version表示12.8)のみでCUDA Toolkit自体が未導入だったため、
+  ドライバと同一バンドルバージョンのCUDA Toolkit 12.8.1をインストールした
+  (ドライバ更新なし)。またこの機のGPUはNVIDIA RTX 2000 Ada Generation
+  (compute capability 8.9)であり、CMakeLists.txtのデフォルト
+  `CMAKE_CUDA_ARCHITECTURES 120`(Blackwell向け)とは異なるため、この機での
+  ローカルビルド・検証時は`-DCMAKE_CUDA_ARCHITECTURES=89`を明示指定する必要が
+  ある(プロジェクトのデフォルト値=実運用ターゲットのRTX 5070 Ti想定は変更
+  していない)。
+  さらに、この機に入っていたVisual Studio(バージョン18、MSVC 19.51)はnvcc
+  12.8が公式サポートする範囲(VS2017〜2022)を超えており、`cudafe++`が
+  ヘッダー解析中にACCESS_VIOLATIONでクラッシュした(`-allow-unsupported-compiler`
+  でバージョンチェックを回避しても再発する実質的な非互換)。CUDA 13.x系でも
+  最新時点(13.3/13.4)でサポートされるVisual Studioは依然2019/2022までであり
+  この問題は解決しないため、CUDAのバージョンは12.8のまま据え置き、代わりに
+  VS2022 Build Tools(MSVC 14.44)を`C:\BuildTools2022`へ共存インストールし、
+  そちらをCUDAビルド専用のホストコンパイラとして使う方針とした(既存のVS 18は
+  無変更)。
+  この構成で`SvtJpegxsSampleEncoderCuda`の実ビルド・リンクに成功した。
+
+  [実データ検証で判明したCUDA移植側の不具合 (2026-08-26)] `SvtJpegxsSampleEncoderCuda`
+  で`testdata/SOMED_TUM/`の実PPM(3840x2160, 10bit)を実際にエンコードした
+  ところ、CPU版とCUDA版でビットストリームのサイズは一致する(3,110,400バイト)
+  もののbit-exactではなかった(約1.7%のバイトが不一致)。これはPhase 1〜4の
+  既存自動テスト(`*Cuda*` 20/20、いずれもランダム合成データのみ使用)が一度も
+  検出していなかった不具合であり、原因切り分け(サブエージェントによる調査、
+  詳細は下記)の結果、以下が判明した:
+    - 原因はRGB444/クロマサブサンプリング無しという色フォーマット自体とは
+      無関係(ランダム合成データではRGB444フル解像度でもbit-exact一致を確認
+      済み)。「実画像特有の内容」と「precinct数の多いフル幅(3840)」の両方が
+      揃って初めて発現する。
+    - DWT・GC(scalar版)は実データでbit-exactと確認済み。RC二分探索/LUT構築
+      (`rate_control_precinct`相当のCUDA実装)も実データの実際のgcli/
+      significance/係数を用いて独立再計算した結果とビット完全一致することを
+      確認済み。
+    - 真の原因はPack段: CUDA版の`efc_write_packet_header()`
+      (`EncodeFrameCuda.cu`)がパケットヘッダの最上位ビット(raw_codingフラグ、
+      CPU版`write_packet_header()`の`mem[0] = raw_coding << 7`に相当)を
+      **常に0に固定**しており、CPU版`pack_precinct()`が実装している
+      「RAWモードパケット符号化」(通常のビットプレーン符号化よりRAWの生格納の
+      方が小さくなる場合にRC側が選択する経路、`RateControl.c`の
+      `packet_methods_raw[]`判定、`PackPrecinct.c`の
+      `pack_bitplane_count_raw()`)が、CUDA側には**一切実装されていない**
+      (カーネル・ホスト側の見積もりロジックともに欠落)。
+    - 本節冒頭のPhase 2の訂正記載のとおり、hdr_Rl(RAWモード)はデフォルトで
+      有効であり、CUDA移植の各`.cuh`ファイル(`PackCuda.cuh`,
+      `RcQuantCuda.cuh`, `EncodeFrameCuda.cuh`)のコメント自体は
+      「hdr_Rl=0前提」と正しく明記していたが、PortingStrategy.txt側の
+      「デフォルト設定では使われない経路」という誤った根拠付けにより、
+      この前提が呼び出し側(サンプルアプリ)まで正しく伝播していなかった。
+      ランダム合成データはエントロピーが高くRAWモードがほぼ選ばれないため、
+      20/20の既存テストはこの欠落を一度も踏まなかった。
+    - [対応方針・ユーザー確認待ち] CUDA Pack側へのRAWモード実装は今回の
+      セッションのスコープ外とする(アーキテクチャ上小さくない追加実装の
+      ため)。代わりに`SvtJpegxsSampleEncoderCuda`側で
+      `enc.coding_raw_disable = 1`(`hdr_Rl = 0`)を明示的に設定し、CUDA移植が
+      実際に検証済みのスコープ内に収める形で対応する方針を提案する
+      (未実装・未検証、ユーザー確認後に実装しbit-exact再検証する)。RAWモード
+      自体のCUDA実装は将来のPhase 5候補として記録する。

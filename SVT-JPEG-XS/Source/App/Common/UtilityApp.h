@@ -7,6 +7,8 @@
 #define __APP_UTILITY_H__
 #include <time.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -81,6 +83,33 @@ void sleep_in_ms(const unsigned milliseconds) {
 #else
     nanosleep(&(struct timespec){milliseconds / 1000, (milliseconds % 1000) * 1000000}, NULL);
 #endif
+}
+
+/* Parses a single bpp CLI argument formatted as an integer or a decimal
+ * (e.g. "0.5", "3", "3.75"), the same convention EncApp's "--bpp" uses (see
+ * set_encoder_bpp() in Source/App/EncApp/EncAppConfig.c), into the
+ * numerator/denominator pair svt_jpeg_xs_encoder_api_t expects. */
+static __inline void parse_bpp_arg(const char* value, uint32_t* bpp_numerator, uint32_t* bpp_denominator) {
+    char* end;
+    *bpp_numerator = strtoul(value, &end, 0);
+    *bpp_denominator = 1;
+    if (*end != '\0') {
+        while (*value) {
+            if (*value == '.' || *value == ',') {
+                value++;
+                break;
+            }
+            value++;
+        }
+        if (*value) {
+            uint32_t fraction = strtoul(value, &end, 0);
+            uint32_t chars = (uint32_t)(end - value);
+            for (uint32_t i = 0; i < chars; ++i) {
+                *bpp_denominator *= 10;
+            }
+            *bpp_numerator = *bpp_numerator * (*bpp_denominator) + fraction;
+        }
+    }
 }
 
 size_t get_file_size(FILE* f) {
