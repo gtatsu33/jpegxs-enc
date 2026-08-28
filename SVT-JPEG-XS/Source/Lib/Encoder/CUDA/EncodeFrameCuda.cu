@@ -56,6 +56,24 @@ struct EfcBandLineLut {
     uint32_t leftover_extra;
 };
 
+/* Forward declaration: svt_cuda_frame_context_create_from_pi() (section 1,
+ * below) needs to pass this kernel to cudaFuncSetAttribute() (to opt into a
+ * larger dynamic shared-memory limit for the Phase 6 gcli-subpacket scatter
+ * pass -- see that function's body) before the kernel's full definition
+ * (section 7) appears later in this file. Must stay byte-for-byte identical
+ * to the definition's signature. */
+__global__ void k_pack_precinct_frame(const SvtCudaFrameBandGeom* bands, uint32_t bands_num_all, uint32_t bands_num_exists,
+                                      uint16_t* const* pyramid_ptrs, const uint32_t* comp_stride, const uint8_t* gcli_frame,
+                                      const uint8_t* sig_frame, const uint8_t* gtli_all, const uint8_t* pack_method_all,
+                                      uint32_t packets_num, const svt_cuda_pack_packet_t* packets, uint8_t use_short_header,
+                                      const uint8_t* quantization_all, const uint8_t* refinement_all,
+                                      const uint32_t* total_bytes_all, const uint32_t* padding_bytes_all,
+                                      const uint32_t* out_offset_all, const uint32_t* psd_all, const uint32_t* psg_all,
+                                      const uint32_t* pss_all, const uint8_t* packet_methods_raw_all,
+                                      const uint32_t* packet_offset_all, const uint32_t* packet_group_base,
+                                      uint8_t* out_buffer, int* out_error);
+/* NOTE: keep this declaration's parameter list identical to the definition (section 7). */
+
 /* =====================================================================
  * 1. Context construction from a real pi_t/pi_enc_t.
  * ===================================================================== */
@@ -136,9 +154,20 @@ int svt_cuda_frame_context_create_from_pi(SvtCudaFrameContext* ctx, const pi_t* 
      * Uses the NORMAL-row geometry already enforced above. */
     ctx->h_packet_size_gcli_raw_bytes = (uint32_t*)malloc((pi->packets_num ? pi->packets_num : 1) * sizeof(uint32_t));
     ctx->h_packets_exist = (uint8_t*)malloc(pi->packets_num ? pi->packets_num : 1);
+    /* packets_num+1 entries: packet_group_base[p+1]-packet_group_base[p] gives
+     * k_pack_precinct_frame()'s efc_pack_gcli_parallel() the group COUNT for
+     * packet p (the trailing sentinel entry holds the grand total) without a
+     * separate array. */
+    std::vector<uint32_t> packet_group_base(pi->packets_num + 1);
+    uint32_t group_running = 0;
     for (uint32_t p = 0; p < pi->packets_num; p++) {
         uint32_t raw_bits = 0;
         uint8_t exists = 0;
+        packet_group_base[p] = group_running; /* Phase 6: this packet's starting slot in
+                                                * k_pack_precinct_frame()'s per-block shared-
+                                                * memory gcli-offset table -- purely geometric
+                                                * (band widths + this packet's fixed line_idx),
+                                                * so safe to compute once here. */
         for (uint32_t bidx = pi->packets[p].band_start; bidx < pi->packets[p].band_stop; bidx++) {
             const SvtCudaFrameBandGeom& g = bands[bidx];
             if (g.band_id == BAND_NOT_EXIST)
@@ -146,6 +175,7 @@ int svt_cuda_frame_context_create_from_pi(SvtCudaFrameContext* ctx, const pi_t* 
             if (pi->packets[p].line_idx < g.height_lines_num) {
                 raw_bits += g.gcli_width * 4;
                 exists = 1;
+                group_running += g.gcli_width;
             }
         }
         ctx->h_packet_size_gcli_raw_bytes[p] = (raw_bits + 7) >> 3;
@@ -154,6 +184,67 @@ int svt_cuda_frame_context_create_from_pi(SvtCudaFrameContext* ctx, const pi_t* 
          * independent under this context's NORMAL-only scope -- see
          * k_pack_precinct_frame()'s has_band check, which this replicates. */
         ctx->h_packets_exist[p] = exists;
+    }
+    packet_group_base[pi->packets_num] = group_running; /* sentinel: grand total group count */
+    /* efc_pack_gcli_parallel() reuses ONE small shared-memory offset table
+     * across packets (processed one at a time), sized to the WIDEST single
+     * packet's group count rather than the sum over all packets -- an
+     * earlier version sized it to the grand total (up to ~45KB/block on a
+     * real 4K image) and that shared-memory footprint alone crushed
+     * occupancy enough to make graph2 measurably SLOWER than before this
+     * feature existed, even with the actual scatter writes disabled for
+     * diagnosis (see PortingStrategy.txt Phase 6 notes) -- confirming the
+     * regression was about the size of the reservation, not what ran inside
+     * it. */
+    uint32_t max_groups_per_packet = 0;
+    for (uint32_t p = 0; p < pi->packets_num; p++) {
+        uint32_t count = packet_group_base[p + 1] - packet_group_base[p];
+        if (count > max_groups_per_packet) {
+            max_groups_per_packet = count;
+        }
+    }
+    ctx->gcli_scan_shared_bytes = max_groups_per_packet * (uint32_t)sizeof(uint32_t);
+    err = cudaMalloc(&ctx->d_packet_group_base, (pi->packets_num + 1) * sizeof(uint32_t));
+    if (err == cudaSuccess) {
+        err = cudaMemcpy(ctx->d_packet_group_base, packet_group_base.data(), (pi->packets_num + 1) * sizeof(uint32_t),
+                         cudaMemcpyHostToDevice);
+    }
+    if (err != cudaSuccess) {
+        svt_cuda_frame_context_destroy(ctx);
+        return -(int)err;
+    }
+
+    /* Phase 6: k_pack_precinct_frame() now needs ctx->gcli_scan_shared_bytes of
+     * dynamic shared memory per block (one uint32_t slot per coefficient-group
+     * across all bands of one precinct -- see FrameContextCuda.cuh). Confirm
+     * this device can actually provide that much per block, and opt into the
+     * larger-than-default (48KB static) limit if needed, once here rather than
+     * on every svt_cuda_encode_frame() call. */
+    if (ctx->gcli_scan_shared_bytes > 0) {
+        int device = 0;
+        int max_shared_optin = 0;
+        if ((err = cudaGetDevice(&device)) != cudaSuccess ||
+            (err = cudaDeviceGetAttribute(&max_shared_optin, cudaDevAttrMaxSharedMemoryPerBlockOptin, device)) !=
+                cudaSuccess) {
+            svt_cuda_frame_context_destroy(ctx);
+            return -(int)err;
+        }
+        if (ctx->gcli_scan_shared_bytes > (uint32_t)max_shared_optin) {
+            /* Out of scope: this geometry needs more per-block shared memory
+             * than the device can provide for the gcli-subpacket scatter
+             * pass. Matches the project's existing pattern of erroring out
+             * cleanly on unsupported configurations rather than silently
+             * corrupting output. */
+            svt_cuda_frame_context_destroy(ctx);
+            return 1;
+        }
+        if (ctx->gcli_scan_shared_bytes > 49152 /* default static/dynamic shared mem limit on all supported archs */) {
+            if ((err = cudaFuncSetAttribute(k_pack_precinct_frame, cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                            (int)ctx->gcli_scan_shared_bytes)) != cudaSuccess) {
+                svt_cuda_frame_context_destroy(ctx);
+                return -(int)err;
+            }
+        }
     }
     return 0;
 }
@@ -639,11 +730,6 @@ __device__ __forceinline__ void efc_vlc_encode_simple(EfcWriter* bw, int32_t nbi
         efc_write_1_bit(bw, 0);
     }
 }
-__device__ void efc_pack_significance(EfcWriter* bw, uint8_t gtli, const uint8_t* sig_max, uint32_t width) {
-    for (uint32_t i = 0; i < width; i++) {
-        efc_write_1_bit(bw, sig_max[i] <= gtli ? 1 : 0);
-    }
-}
 /* Phase 5: RAW GCLI sub-packet, matches PackPrecinct.c's pack_bitplane_count_raw()
  * -- each band's raw (un-truncated) per-group bitplane count is written as a
  * fixed 4-bit nibble, reusing the existing efc_write_4_bits_align4() writer. */
@@ -678,81 +764,32 @@ __device__ void efc_pack_bitplane_count_significance(EfcWriter* bw, const uint8_
         }
     }
 }
-__device__ void efc_pack_data_single_group(EfcWriter* bw, const uint16_t* buf, uint8_t gcli, uint8_t gtli) {
-    uint16_t tmp[4];
-    for (int i = 0; i < 4; i++) {
-        tmp[i] = (uint16_t)((unsigned)buf[i] << ((EFC_SIGN_BIT_POS + 1) - gcli));
-    }
-    for (int32_t bits = (int32_t)gcli - gtli - 1; bits >= 0; bits--) {
-        uint16_t val = (uint16_t)(tmp[0] & EFC_SIGN_MASK);
-        tmp[0] = (uint16_t)(tmp[0] << 1);
-        val = (uint16_t)(val | ((tmp[1] & EFC_SIGN_MASK) >> 1));
-        tmp[1] = (uint16_t)(tmp[1] << 1);
-        val = (uint16_t)(val | ((tmp[2] & EFC_SIGN_MASK) >> 2));
-        tmp[2] = (uint16_t)(tmp[2] << 1);
-        val = (uint16_t)(val | ((tmp[3] & EFC_SIGN_MASK) >> 3));
-        tmp[3] = (uint16_t)(tmp[3] << 1);
-        val = (uint16_t)(val >> (EFC_SIGN_BIT_POS - 3));
-        efc_write_4_bits_align4(bw, (uint8_t)val);
-    }
-}
-__device__ void efc_pack_data(EfcWriter* bw, const uint16_t* buf, uint32_t width, const uint8_t* gclis, uint8_t gtli) {
-    uint32_t groups = width / EFC_GROUP_SIZE;
-    uint32_t leftover = width % EFC_GROUP_SIZE;
-    uint32_t group = 0;
-    for (; group < groups; group++) {
-        if (gclis[group] > gtli) {
-            uint8_t signs = (uint8_t)((buf[0] & EFC_SIGN_MASK) >> (EFC_SIGN_BIT_POS - 3));
-            signs |= (uint8_t)((buf[1] & EFC_SIGN_MASK) >> (EFC_SIGN_BIT_POS - 2));
-            signs |= (uint8_t)((buf[2] & EFC_SIGN_MASK) >> (EFC_SIGN_BIT_POS - 1));
-            signs |= (uint8_t)((buf[3] & EFC_SIGN_MASK) >> (EFC_SIGN_BIT_POS - 0));
-            efc_write_4_bits_align4(bw, signs);
-            efc_pack_data_single_group(bw, buf, gclis[group], gtli);
-        }
-        buf += EFC_GROUP_SIZE;
-    }
-    if (leftover) {
-        if (gclis[group] > gtli) {
-            for (uint32_t i = 0; i < EFC_GROUP_SIZE; i++) {
-                efc_write_1_bit(bw, (i < leftover) ? (uint8_t)(buf[i] >> EFC_SIGN_BIT_POS) : 0);
-            }
-            for (int32_t bits = (int32_t)gclis[group] - 1; bits >= gtli; bits--) {
-                for (uint32_t i = 0; i < EFC_GROUP_SIZE; i++) {
-                    efc_write_1_bit(bw, (i < leftover) ? (uint8_t)(buf[i] >> bits) : 0);
-                }
-            }
-        }
-    }
-}
-
-/* Packs ONE packet (significance + GCLI + data sub-packets) into `bw`, which
- * the caller has already positioned at this packet's precomputed byte
- * offset. Split out of k_pack_precinct_frame() so it can be called
- * independently per packet-thread (see that kernel's comment). Returns 0 on
- * success, matching the *out_error codes the caller used to set inline
+/* Writes ONE packet's header into `bw` (which the caller has already
+ * positioned at this packet's precomputed byte offset) and validates/skips
+ * past its three sub-packets' byte spans. Split out of k_pack_precinct_frame()
+ * so it can be called independently per packet-thread (see that kernel's
+ * comment). The actual significance/gcli/data CONTENT is written separately
+ * by efc_pack_{significance,gcli,data}_parallel() (coefficient-group-parallel
+ * scatter passes, see PortingStrategy.txt Phase 6 notes) -- this function no
+ * longer touches band/coefficient data at all, only the header and the
+ * byte-length bookkeeping that determines where those passes' regions start.
+ * Returns 0 on success, matching the *out_error codes the caller sets inline
  * (1=significance length mismatch, 2=GCLI length mismatch, 3=data length
  * mismatch). */
-__device__ int efc_pack_one_packet(EfcWriter* bw, const SvtCudaFrameBandGeom* bands, uint16_t* const* pyramid_ptrs,
-                                   const uint32_t* comp_stride, const uint8_t* gcli_frame, const uint8_t* sig_frame,
-                                   const uint8_t* gtli, const uint8_t* pack_method, uint32_t precinct_idx,
-                                   uint8_t use_short_header, uint32_t band_start, uint32_t band_stop, uint32_t line_idx,
-                                   uint8_t is_raw, uint32_t psd_p, uint32_t psg_p, uint32_t pss_p) {
+__device__ int efc_pack_one_packet(EfcWriter* bw, uint8_t use_short_header, uint8_t is_raw, uint32_t psd_p,
+                                   uint32_t psg_p, uint32_t pss_p) {
     efc_write_packet_header(bw, !use_short_header, is_raw, psd_p, psg_p);
     efc_align_byte(bw);
 
     uint32_t bits_last = efc_used_bits(bw);
     if (!is_raw) {
-        /* RAW packets have no significance sub-packet at all (PackPrecinct.c:316-343). */
-        for (uint32_t bidx = band_start; bidx < band_stop; bidx++) {
-            const SvtCudaFrameBandGeom& bi = bands[bidx];
-            if (bi.band_id == BAND_NOT_EXIST || line_idx >= bi.height_lines_num)
-                continue;
-            if (pack_method[bidx] == 1) {
-                uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
-                const uint8_t* sig = sig_frame + bi.sig_offset + (size_t)abs_row * bi.significance_width;
-                efc_pack_significance(bw, gtli[bidx], sig, bi.significance_width);
-            }
-        }
+        /* RAW packets have no significance sub-packet at all (PackPrecinct.c:316-343).
+         * The actual bit content is written separately by efc_pack_significance_parallel()
+         * (coefficient-group-parallel scatter pass, see PortingStrategy.txt Phase 6 pilot
+         * notes) -- here we only need to advance the writer past this sub-packet's
+         * (already byte-aligned) span so the gcli/data sub-packets below start at the
+         * right offset. */
+        bw->offset += pss_p;
     }
     efc_align_byte(bw);
     if (efc_used_bits(bw) - bits_last != pss_p * 8) {
@@ -760,43 +797,687 @@ __device__ int efc_pack_one_packet(EfcWriter* bw, const SvtCudaFrameBandGeom* ba
     }
 
     bits_last = efc_used_bits(bw);
-    for (uint32_t bidx = band_start; bidx < band_stop; bidx++) {
-        const SvtCudaFrameBandGeom& bi = bands[bidx];
-        if (bi.band_id == BAND_NOT_EXIST || line_idx >= bi.height_lines_num)
-            continue;
-        uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
-        const uint8_t* gcli = gcli_frame + bi.gcli_offset + (size_t)abs_row * bi.gcli_width;
-        if (is_raw) {
-            efc_pack_bitplane_count_raw(bw, gcli, bi.gcli_width);
-        }
-        else if (pack_method[bidx] == 1) {
-            const uint8_t* sig = sig_frame + bi.sig_offset + (size_t)abs_row * bi.significance_width;
-            efc_pack_bitplane_count_significance(bw, gcli, bi.gcli_width, gtli[bidx], sig, EFC_SIGNIFICANCE_GROUP_SIZE);
-        }
-        else {
-            efc_pack_bitplane_count_no_significance(bw, gcli, bi.gcli_width, gtli[bidx]);
-        }
-    }
+    /* The actual bit content is written separately by efc_pack_gcli_parallel()
+     * (coefficient-group-parallel scatter pass, see PortingStrategy.txt
+     * Phase 6 notes) -- here we only need to advance the writer past this
+     * sub-packet's (already byte-aligned) span so the data sub-packet below
+     * starts at the right offset. */
+    bw->offset += psg_p;
     efc_align_byte(bw);
     if (efc_used_bits(bw) - bits_last != psg_p * 8) {
         return 2;
     }
 
     bits_last = efc_used_bits(bw);
-    for (uint32_t bidx = band_start; bidx < band_stop; bidx++) {
-        const SvtCudaFrameBandGeom& bi = bands[bidx];
-        if (bi.band_id == BAND_NOT_EXIST || line_idx >= bi.height_lines_num)
-            continue;
-        uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
-        const uint8_t* gcli = gcli_frame + bi.gcli_offset + (size_t)abs_row * bi.gcli_width;
-        const uint16_t* coeff = pyramid_ptrs[bi.comp_id] + (size_t)(bi.y + abs_row) * comp_stride[bi.comp_id] + bi.x;
-        efc_pack_data(bw, coeff, bi.width, gcli, gtli[bidx]);
-    }
+    /* The actual bit content is written separately by efc_pack_data_parallel()
+     * (coefficient-group-parallel scatter pass, see PortingStrategy.txt
+     * Phase 6 notes) -- here we only need to advance the writer past this
+     * (already byte-aligned) sub-packet's span. */
+    bw->offset += psd_p;
     efc_align_byte(bw);
     if (efc_used_bits(bw) - bits_last != psd_p * 8) {
         return 3;
     }
     return 0;
+}
+
+/* 2026-08-28 Phase 6 pilot: coefficient-group-parallel scatter write of the
+ * significance sub-packet (see PortingStrategy.txt Phase 6 pilot notes).
+ * Unlike the gcli/data sub-packets (still packet-thread-serial for now, see
+ * efc_pack_one_packet() above), each significance bit's value depends only
+ * on its own coefficient-group (`sig_max[i] <= gtli`, fixed 1 bit/group, no
+ * VLC and no inter-group state) -- so any thread can compute and write it
+ * independently given the group's absolute bit offset within the
+ * sub-packet. Cooperatively run by ALL threads in the block (called once per
+ * precinct-block from k_pack_precinct_frame, after the per-packet loop);
+ * covers every packet's significance span in the precinct. Band ownership of
+ * a given bit index is resolved by a small linear scan over the packet's
+ * band range (typically ~3 bands/packet) rather than a precomputed offset
+ * table, since that scan is cheap at this scale and avoids adding new
+ * host-computed buffers for this pilot. */
+/* Sets a single bit to 1 at absolute bit position `bit_idx` (MSB-first within
+ * each byte, matching efc_write_1_bit()'s convention) within `region`. CUDA
+ * has no native 8-bit atomicOr, so this ORs into the containing 32-bit-
+ * aligned word instead -- the other 3 byte lanes are OR'd with 0 (no-op), so
+ * concurrent calls from unrelated threads/regions cannot corrupt each other;
+ * it only requires the 4-byte-aligned window to stay within the output
+ * allocation (see the +4 byte safety margin on d_pack_out in
+ * FrameContextCuda.cu). Caller must ensure the target byte was already
+ * zeroed (this only ever sets bits, never clears). Shared by
+ * efc_pack_significance_parallel() and efc_pack_gcli_parallel(). */
+__device__ __forceinline__ void efc_atomic_write_bit(uint8_t* region, uint32_t bit_idx) {
+    uint8_t* target = region + (bit_idx >> 3);
+    uint8_t mask = (uint8_t)(1u << (7 - (bit_idx & 7)));
+    uint32_t* word = (uint32_t*)((uintptr_t)target & ~(uintptr_t)3);
+    uint32_t byte_in_word = (uint32_t)((uintptr_t)target & 3);
+    atomicOr(word, ((uint32_t)mask) << (byte_in_word * 8));
+}
+
+__device__ void efc_pack_significance_parallel(uint8_t* precinct_mem, uint32_t header_len_bytes,
+                                                const svt_cuda_pack_packet_t* packets, uint32_t packets_num,
+                                                const SvtCudaFrameBandGeom* bands, const uint8_t* gtli,
+                                                const uint8_t* pack_method, const uint8_t* sig_frame,
+                                                uint32_t precinct_idx, const uint32_t* packet_offset,
+                                                const uint32_t* pss, uint8_t use_short_header) {
+    uint32_t pack_header_bytes = use_short_header ? EFC_PACKET_HEADER_SHORT_SIZE_BYTES : EFC_PACKET_HEADER_LONG_SIZE_BYTES;
+
+    /* Zero-init pass: the atomicOr scatter below only ever sets bits, so the
+     * region must start at a known all-zero baseline (unlike the sequential
+     * EfcWriter path, which relies on a byte's first write being a plain
+     * assignment rather than an OR -- not available here since write order
+     * across threads is unspecified). */
+    for (uint32_t p = 0; p < packets_num; p++) {
+        uint32_t sig_bytes = pss[p];
+        if (sig_bytes == 0) {
+            continue;
+        }
+        uint8_t* sig_region = precinct_mem + header_len_bytes + packet_offset[p] + pack_header_bytes;
+        for (uint32_t b = threadIdx.x; b < sig_bytes; b += blockDim.x) {
+            sig_region[b] = 0;
+        }
+    }
+    __syncthreads();
+
+    for (uint32_t p = 0; p < packets_num; p++) {
+        uint32_t sig_bytes = pss[p];
+        if (sig_bytes == 0) {
+            continue;
+        }
+        uint8_t* sig_region = precinct_mem + header_len_bytes + packet_offset[p] + pack_header_bytes;
+        uint32_t band_start = packets[p].band_start;
+        uint32_t band_stop = packets[p].band_stop;
+        uint32_t line_idx = packets[p].line_idx;
+        uint32_t total_bits = sig_bytes * 8;
+
+        for (uint32_t k = threadIdx.x; k < total_bits; k += blockDim.x) {
+            uint32_t cur = 0;
+            uint32_t local_group = 0;
+            uint32_t owner = 0;
+            int found = 0;
+            for (uint32_t bidx = band_start; bidx < band_stop; bidx++) {
+                const SvtCudaFrameBandGeom& bi = bands[bidx];
+                if (bi.band_id == BAND_NOT_EXIST || line_idx >= bi.height_lines_num || pack_method[bidx] != 1) {
+                    continue;
+                }
+                uint32_t width = bi.significance_width;
+                if (k < cur + width) {
+                    owner = bidx;
+                    local_group = k - cur;
+                    found = 1;
+                    break;
+                }
+                cur += width;
+            }
+            if (!found) {
+                continue; /* trailing byte-alignment padding bits -- stay 0 */
+            }
+
+            const SvtCudaFrameBandGeom& bi = bands[owner];
+            uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
+            const uint8_t* sig = sig_frame + bi.sig_offset + (size_t)abs_row * bi.significance_width;
+            if (sig[local_group] > gtli[owner]) {
+                continue; /* bit is 0 -- region already zeroed */
+            }
+            efc_atomic_write_bit(sig_region, k);
+        }
+    }
+}
+
+/* Sets a contiguous run of `nbits` one-bits starting at absolute bit position
+ * `bit_off` (MSB-first, matching efc_write_1_bit()'s convention) -- one
+ * atomicOr per BYTE the run touches (at most ceil(nbits/8)+1) rather than one
+ * atomicOr per BIT, since efc_pack_gcli_parallel()'s VLC runs (see that
+ * function's comment) can span several bytes and per-bit atomics dominated
+ * measured cost when this was first tried. The inner mask-building loop is
+ * pure register arithmetic (no memory access), so only the atomicOr calls
+ * themselves are the expensive part being reduced. */
+__device__ __forceinline__ void efc_atomic_write_run_of_ones(uint8_t* region, uint32_t bit_off, uint32_t nbits) {
+    uint32_t bit_end = bit_off + nbits;
+    uint32_t byte_start = bit_off >> 3;
+    uint32_t byte_end = (bit_end + 7) >> 3;
+    for (uint32_t byte_idx = byte_start; byte_idx < byte_end; byte_idx++) {
+        uint32_t byte_bit_lo = byte_idx * 8;
+        uint32_t byte_bit_hi = byte_bit_lo + 8;
+        uint32_t lo = bit_off > byte_bit_lo ? bit_off : byte_bit_lo;
+        uint32_t hi = bit_end < byte_bit_hi ? bit_end : byte_bit_hi;
+        uint8_t mask = 0;
+        for (uint32_t p = lo; p < hi; p++) {
+            mask |= (uint8_t)(1u << (7 - (p & 7)));
+        }
+        uint8_t* target = region + byte_idx;
+        uint32_t* word = (uint32_t*)((uintptr_t)target & ~(uintptr_t)3);
+        uint32_t byte_in_word = (uint32_t)((uintptr_t)target & 3);
+        atomicOr(word, ((uint32_t)mask) << (byte_in_word * 8));
+    }
+}
+
+__device__ __forceinline__ void efc_atomic_write_nibble(uint8_t* region, uint32_t nibble_idx, uint8_t value) {
+    if (value == 0) {
+        return; /* region already zeroed */
+    }
+    uint8_t* target = region + (nibble_idx >> 1);
+    uint32_t shift_in_byte = (nibble_idx & 1) ? 0u : 4u; /* efc_write_4_bits_align4(): group0 -> high nibble first */
+    uint32_t* word = (uint32_t*)((uintptr_t)target & ~(uintptr_t)3);
+    uint32_t byte_in_word = (uint32_t)((uintptr_t)target & 3);
+    atomicOr(word, (((uint32_t)value & 0xFu) << shift_in_byte) << (byte_in_word * 8));
+}
+
+/* Phase 6: coefficient-group-parallel scatter write of the gcli(bitplane-count)
+ * sub-packet. Unlike significance (fixed 1 bit/group), this sub-packet is a
+ * VLC (variable-length code): efc_vlc_encode_simple()'s three branches all
+ * reduce to the same rule -- write `nbits` one-bits followed by a single
+ * terminating zero-bit (total length nbits+1), where
+ * nbits = bitplane[i] > gtli ? bitplane[i]-gtli : 0 (0 when pack_method==1
+ * and the group's 8-group significance-group is gated off, matching
+ * PackPrecinct.c's pack_bitplane_count_significance()). Because the length is
+ * runtime-data-dependent (unlike significance's static band geometry), each
+ * group's absolute bit offset needs a real prefix-sum scan.
+ *
+ * [2026-08-28] This scan is now a flat GROUP-parallel exclusive scan across
+ * the whole packet (not band-parallel -- an earlier band-parallel version
+ * left ~5% of graph2 time on the table because a packet has only ~3 active
+ * bands, so only ~3/128 threads ever did real work; see PortingStrategy.txt
+ * Phase 6 notes and the plan file referenced there for the full diagnosis):
+ *   Phase 1 (blocked partition, 128-way parallel): this packet's `count`
+ *   groups are split into contiguous per-thread chunks. Each thread walks
+ *   its own chunk (crossing band boundaries via a small cursor, since a
+ *   chunk isn't guaranteed to stay inside one band), computing each group's
+ *   nbits and a THREAD-LOCAL running bit offset into s_gcli_offsets, ending
+ *   with its chunk's total bit length in a register.
+ *   Warp scan + combine: each warp turns its 32 threads' chunk totals into
+ *   an exclusive scan via __shfl_up_sync (no shared memory, no barrier);
+ *   each warp's total goes into a tiny s_warp_total[] (one syncthreads to
+ *   publish it); every thread then adds its warp's base (a few registers,
+ *   no barrier) to fold the packet-global offset into the entries it wrote
+ *   in Phase 1 -- same "<<5 into the upper bits, low 5 length bits
+ *   untouched" trick the old band-parallel version used.
+ *   Pass C (parallel, grid-stride over every group of every non-RAW packet):
+ *   look up the precomputed offset+length and atomicOr-write the `nbits`
+ *   one-bits via efc_atomic_write_bit() (the terminating zero-bit needs no
+ *   write -- the region was zeroed first).
+ * RAW packets (packet_methods_raw[p]==1) skip this VLC path entirely:
+ * pack_bitplane_count_raw() is a fixed 4-bits/group nibble write, so -- like
+ * significance -- its offset is directly derivable from band geometry alone,
+ * no scan needed (handled in its own branch below, sharing this function's
+ * zero-init pass since both write into the same byte region). */
+__device__ void efc_pack_gcli_parallel(uint8_t* precinct_mem, uint32_t header_len_bytes,
+                                        const svt_cuda_pack_packet_t* packets, uint32_t packets_num,
+                                        const SvtCudaFrameBandGeom* bands, const uint8_t* gtli, const uint8_t* pack_method,
+                                        const uint8_t* gcli_frame, const uint8_t* sig_frame, uint32_t precinct_idx,
+                                        const uint32_t* packet_offset, const uint32_t* pss, const uint32_t* psg,
+                                        const uint8_t* packet_methods_raw, const uint32_t* packet_group_base,
+                                        uint8_t use_short_header, uint32_t* s_gcli_offsets) {
+    uint32_t pack_header_bytes = use_short_header ? EFC_PACKET_HEADER_SHORT_SIZE_BYTES : EFC_PACKET_HEADER_LONG_SIZE_BYTES;
+    /* Small STATIC shared scratch for the per-WARP chunk totals used by the
+     * group-parallel scan below (one slot per warp in the block, e.g. 4 for
+     * the current 128-thread launch config -- sized to 32 so this stays
+     * correct if PACK_THREADS_PER_BLOCK is ever retuned up to 1024).
+     * Declared here (rather than as a parameter) since it's purely an
+     * implementation detail of this function, unlike s_gcli_offsets which
+     * is sized per-context and must be passed in from the caller. */
+    __shared__ uint32_t s_warp_total[32];
+    const unsigned lane = threadIdx.x & 31u;
+    const unsigned warp_id = threadIdx.x >> 5;
+
+    /* Zero-init pass (covers both RAW and non-RAW packets' gcli regions --
+     * the gcli sub-packet always starts right after the (possibly empty,
+     * pss[p]==0 for RAW) significance sub-packet). */
+    for (uint32_t p = 0; p < packets_num; p++) {
+        uint32_t gcli_bytes = psg[p];
+        if (gcli_bytes == 0) {
+            continue;
+        }
+        uint8_t* region = precinct_mem + header_len_bytes + packet_offset[p] + pack_header_bytes + pss[p];
+        for (uint32_t b = threadIdx.x; b < gcli_bytes; b += blockDim.x) {
+            region[b] = 0;
+        }
+    }
+    __syncthreads();
+
+    /* RAW packets: fixed 4-bit/group nibble write, direct offset (no scan). */
+    for (uint32_t p = 0; p < packets_num; p++) {
+        if (!packet_methods_raw[p]) {
+            continue;
+        }
+        uint32_t gcli_bytes = psg[p];
+        if (gcli_bytes == 0) {
+            continue;
+        }
+        uint8_t* region = precinct_mem + header_len_bytes + packet_offset[p] + pack_header_bytes + pss[p];
+        uint32_t band_start = packets[p].band_start;
+        uint32_t band_stop = packets[p].band_stop;
+        uint32_t line_idx = packets[p].line_idx;
+        uint32_t total_nibbles = gcli_bytes * 2;
+
+        for (uint32_t k = threadIdx.x; k < total_nibbles; k += blockDim.x) {
+            uint32_t cur = 0;
+            uint32_t local_group = 0;
+            uint32_t owner = 0;
+            int found = 0;
+            for (uint32_t bidx = band_start; bidx < band_stop; bidx++) {
+                const SvtCudaFrameBandGeom& bi = bands[bidx];
+                if (bi.band_id == BAND_NOT_EXIST || line_idx >= bi.height_lines_num) {
+                    continue;
+                }
+                uint32_t width = bi.gcli_width;
+                if (k < cur + width) {
+                    owner = bidx;
+                    local_group = k - cur;
+                    found = 1;
+                    break;
+                }
+                cur += width;
+            }
+            if (!found) {
+                continue; /* trailing byte-alignment padding nibble -- stays 0 */
+            }
+            const SvtCudaFrameBandGeom& bi = bands[owner];
+            uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
+            const uint8_t* gcli = gcli_frame + bi.gcli_offset + (size_t)abs_row * bi.gcli_width;
+            efc_atomic_write_nibble(region, k, gcli[local_group]);
+        }
+    }
+
+    /* Non-RAW packets: processed ONE PACKET AT A TIME, reusing the same
+     * small shared-memory offset table (sized to the WIDEST single packet's
+     * group count, ctx->gcli_scan_shared_bytes -- see
+     * svt_cuda_frame_context_create_from_pi()) rather than holding every
+     * packet's groups simultaneously. An earlier version sized the table to
+     * the grand total across all packets (up to ~45KB/block on a real 4K
+     * image) -- that shared-memory RESERVATION alone was enough to crush
+     * occupancy and make graph2 measurably slower than before this feature
+     * existed, independent of what ran inside it (confirmed by disabling the
+     * actual scatter writes and seeing no change -- see PortingStrategy.txt
+     * Phase 6 notes).
+     *
+     * Phase 1+scan: a flat, GROUP-parallel exclusive scan over this packet's
+     * `count` groups (see the function-level comment above for why this
+     * replaced an earlier band-parallel version). nbits is bounded by
+     * EFC_TRUNCATION_MAX (15) so it fits in the low 5 bits of each
+     * uint32_t slot -- this lets Pass C skip re-deriving band ownership/
+     * gtli/significance entirely. */
+    for (uint32_t p = 0; p < packets_num; p++) {
+        if (packet_methods_raw[p] || psg[p] == 0) {
+            continue;
+        }
+        uint32_t band_start = packets[p].band_start;
+        uint32_t band_stop = packets[p].band_stop;
+        uint32_t line_idx = packets[p].line_idx;
+        uint32_t count = packet_group_base[p + 1] - packet_group_base[p];
+
+        /* Blocked (not round-robin) partition of [0, count) across the
+         * block's threads: thread t owns the contiguous range
+         * [start, end). Blocked assignment is what makes "threads before me
+         * in threadIdx.x order" equal "groups before my chunk in group
+         * order", so the warp-scan-and-combine below is a valid exclusive
+         * prefix sum over the whole packet. */
+        uint32_t elems_per_thread = (count + blockDim.x - 1) / blockDim.x;
+        uint32_t start = threadIdx.x * elems_per_thread;
+        uint32_t end = start + elems_per_thread;
+        if (end > count) {
+            end = count;
+        }
+
+        /* Locate the band (and this thread's local index within it) that
+         * owns group `start`, by walking active bands accumulating their
+         * gcli_width -- a packet has only a handful of bands (~3 typical),
+         * so this is cheap and done once per thread, not once per group. */
+        uint32_t bidx = band_start;
+        uint32_t slot = 0;
+        if (start < count) {
+            for (;;) {
+                const SvtCudaFrameBandGeom& bi = bands[bidx];
+                bool active = (bi.band_id != BAND_NOT_EXIST) && (line_idx < bi.height_lines_num);
+                if (active) {
+                    if (slot + bi.gcli_width > start) {
+                        break;
+                    }
+                    slot += bi.gcli_width;
+                }
+                bidx++;
+            }
+        }
+        uint32_t band_local = start - slot;
+
+        /* Walk this thread's [start, end) chunk, crossing band boundaries
+         * via the cursor above as needed. Band-dependent pointers/values
+         * are reloaded only when the cursor advances to a new band, not
+         * per group. bit_running is THREAD-LOCAL (starts at 0); the
+         * packet-global offset is folded in below after the warp scan. */
+        uint32_t bit_running = 0;
+        uint32_t g = start;
+        while (g < end) {
+            const SvtCudaFrameBandGeom& bi = bands[bidx];
+            uint8_t gt = gtli[bidx];
+            uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
+            const uint8_t* gcli = gcli_frame + bi.gcli_offset + (size_t)abs_row * bi.gcli_width;
+            bool method1 = (pack_method[bidx] == 1);
+            const uint8_t* sig = method1 ? (sig_frame + bi.sig_offset + (size_t)abs_row * bi.significance_width) : nullptr;
+            uint32_t band_remaining = bi.gcli_width - band_local;
+            uint32_t chunk = end - g;
+            if (chunk > band_remaining) {
+                chunk = band_remaining;
+            }
+            for (uint32_t k = 0; k < chunk; k++) {
+                uint32_t li = band_local + k;
+                if (method1) {
+                    if (sig[li / EFC_SIGNIFICANCE_GROUP_SIZE] > gt) {
+                        uint32_t nbits = gcli[li] > gt ? (uint32_t)(gcli[li] - gt) : 0;
+                        s_gcli_offsets[g + k] = (bit_running << 5) | (nbits + 1u);
+                        bit_running += nbits + 1;
+                    }
+                    else {
+                        s_gcli_offsets[g + k] = 0u; /* gated off: 0 bits contributed, nothing to write */
+                    }
+                }
+                else {
+                    uint32_t nbits = gcli[li] > gt ? (uint32_t)(gcli[li] - gt) : 0;
+                    s_gcli_offsets[g + k] = (bit_running << 5) | (nbits + 1u);
+                    bit_running += nbits + 1;
+                }
+            }
+            g += chunk;
+            band_local += chunk;
+            if (band_local == bi.gcli_width) {
+                bidx++;
+                while (bidx < band_stop) {
+                    const SvtCudaFrameBandGeom& bi2 = bands[bidx];
+                    if (bi2.band_id != BAND_NOT_EXIST && line_idx < bi2.height_lines_num) {
+                        break;
+                    }
+                    bidx++;
+                }
+                band_local = 0;
+            }
+        }
+
+        /* Warp-level exclusive scan of each thread's chunk total
+         * (Kogge-Stone via __shfl_up_sync, no shared memory/barrier), then
+         * combine across the block's warps via the tiny s_warp_total[]. */
+        uint32_t scan = bit_running;
+#pragma unroll
+        for (int offset = 1; offset < 32; offset <<= 1) {
+            uint32_t n = __shfl_up_sync(0xFFFFFFFFu, scan, offset);
+            if (lane >= (unsigned)offset) {
+                scan += n;
+            }
+        }
+        uint32_t warp_total = __shfl_sync(0xFFFFFFFFu, scan, 31);
+        uint32_t warp_exclusive = scan - bit_running;
+        if (lane == 0) {
+            s_warp_total[warp_id] = warp_total;
+        }
+        __syncthreads();
+
+        uint32_t warp_base = 0;
+        for (unsigned w = 0; w < warp_id; w++) {
+            warp_base += s_warp_total[w];
+        }
+        uint32_t delta = (warp_base + warp_exclusive) << 5;
+        /* Fold the packet-global offset into only the entries this thread
+         * itself wrote above -- no other thread touches [start, end), so
+         * no synchronization is needed for this step beyond the barrier
+         * above (which published s_warp_total). Same "<<5 into the upper
+         * bits, low 5 length bits untouched" trick as before. */
+        for (uint32_t gi = start; gi < end; gi++) {
+            s_gcli_offsets[gi] += delta;
+        }
+        __syncthreads();
+
+        /* Pass C: parallel scatter over this packet's groups only. Encoded
+         * length is (nbits+1) with 0/1 meaning "nothing to write". */
+        uint8_t* region = precinct_mem + header_len_bytes + packet_offset[p] + pack_header_bytes + pss[p];
+        for (uint32_t local = threadIdx.x; local < count; local += blockDim.x) {
+            uint32_t packed = s_gcli_offsets[local];
+            uint32_t length = packed & 0x1Fu;
+            if (length <= 1) {
+                continue;
+            }
+            uint32_t bit_off = packed >> 5;
+            efc_atomic_write_run_of_ones(region, bit_off, length - 1u);
+        }
+        __syncthreads(); /* before next packet's phase overwrites s_gcli_offsets */
+    }
+}
+
+/* Phase 6: coefficient-group-parallel scatter write of the data sub-packet
+ * (see PortingStrategy.txt Phase 6 notes). Unlike gcli, this doesn't depend
+ * on is_raw or pack_method at all (efc_pack_one_packet() called
+ * efc_pack_data() identically in every case) -- one uniform code path
+ * covers everything.
+ *
+ * Key simplification found while porting efc_pack_data()/
+ * efc_pack_data_single_group(): the trailing "leftover" group (the last
+ * group of a band whose width isn't a multiple of EFC_GROUP_SIZE, written
+ * bit-by-bit in the original) produces bit-for-bit the same layout as a
+ * full group's nibble writes, just with `width % EFC_GROUP_SIZE` "valid
+ * lanes" instead of 4 (the other lanes contribute 0, same as if they were
+ * simply absent) -- so both cases share the same formulas below with a
+ * single `valid_lanes` parameter, no separate leftover path needed.
+ * Per active group (gclis[group] > gtli): nibble_count = gcli-gtli+1
+ * (1 sign nibble + one nibble per bitplane from gcli-1 down to gtli). The
+ * original's `tmp[]` left-shift state machine is just repeated "extract bit
+ * at position X" -- so nibble k (0 = sign, k=1..nibble_count-1 = bitplane
+ * bit_pos = gcli-k) can be computed directly, with no iteration state, from
+ * the original coefficients -- ideal for Pass C's independent per-group
+ * threads. Reuses the exact same shared-memory offset table as
+ * efc_pack_gcli_parallel() (same group geometry, and gcli's use of it is
+ * done by the time this runs) -- nibble_count fits in the low 5 bits like
+ * gcli's length did (max 16). gtli[owner]+nibble_count-1 recovers gcli in
+ * Pass C without re-reading gcli_frame.
+ *
+ * [2026-08-28] Pass A+B uses the same flat GROUP-parallel exclusive scan as
+ * efc_pack_gcli_parallel() (see that function's comment for the full
+ * diagnosis/rationale -- a band-parallel version left only ~3/128 threads
+ * doing real work per packet). This function's version is simpler than
+ * gcli's since nibble_count has no significance/pack_method branch (data
+ * doesn't depend on either -- see above). Pass C (below) is unchanged: it
+ * still needs its own per-group band-ownership lookup (it reads real
+ * coefficient values via pyramid_ptrs, unlike gcli's Pass C), a separate,
+ * out-of-scope inefficiency left for a future pass. */
+__device__ void efc_pack_data_parallel(uint8_t* precinct_mem, uint32_t header_len_bytes,
+                                       const svt_cuda_pack_packet_t* packets, uint32_t packets_num,
+                                       const SvtCudaFrameBandGeom* bands, const uint8_t* gtli, const uint8_t* gcli_frame,
+                                       uint16_t* const* pyramid_ptrs, const uint32_t* comp_stride, uint32_t precinct_idx,
+                                       const uint32_t* packet_offset, const uint32_t* pss, const uint32_t* psg,
+                                       const uint32_t* psd, const uint32_t* packet_group_base, uint8_t use_short_header,
+                                       uint32_t* s_gcli_offsets) {
+    /* Per-warp chunk totals for the group-parallel scan below -- see
+     * efc_pack_gcli_parallel()'s matching declaration for the full
+     * rationale. A separate instance from gcli's (not shared): the two
+     * functions never run concurrently within a block (gcli's per-packet
+     * loop, syncthreads included, fully completes before this one starts),
+     * but each still gets its own small static shared allocation. */
+    __shared__ uint32_t s_warp_total[32];
+    const unsigned lane = threadIdx.x & 31u;
+    const unsigned warp_id = threadIdx.x >> 5;
+    uint32_t pack_header_bytes = use_short_header ? EFC_PACKET_HEADER_SHORT_SIZE_BYTES : EFC_PACKET_HEADER_LONG_SIZE_BYTES;
+
+    for (uint32_t p = 0; p < packets_num; p++) {
+        uint32_t data_bytes = psd[p];
+        if (data_bytes == 0) {
+            continue;
+        }
+        uint8_t* region = precinct_mem + header_len_bytes + packet_offset[p] + pack_header_bytes + pss[p] + psg[p];
+        for (uint32_t b = threadIdx.x; b < data_bytes; b += blockDim.x) {
+            region[b] = 0;
+        }
+    }
+    __syncthreads();
+
+    for (uint32_t p = 0; p < packets_num; p++) {
+        if (psd[p] == 0) {
+            continue;
+        }
+        uint32_t band_start = packets[p].band_start;
+        uint32_t band_stop = packets[p].band_stop;
+        uint32_t line_idx = packets[p].line_idx;
+        uint32_t count = packet_group_base[p + 1] - packet_group_base[p];
+
+        /* Blocked partition of [0, count) across the block's threads --
+         * see efc_pack_gcli_parallel() for why blocked (not round-robin)
+         * assignment is required for the warp-scan-and-combine below to be
+         * a valid exclusive prefix sum. */
+        uint32_t elems_per_thread = (count + blockDim.x - 1) / blockDim.x;
+        uint32_t start = threadIdx.x * elems_per_thread;
+        uint32_t end = start + elems_per_thread;
+        if (end > count) {
+            end = count;
+        }
+
+        /* Locate the band (and this thread's local index within it) that
+         * owns group `start` -- see efc_pack_gcli_parallel() for the same
+         * pattern. */
+        uint32_t bidx = band_start;
+        uint32_t slot = 0;
+        if (start < count) {
+            for (;;) {
+                const SvtCudaFrameBandGeom& bi = bands[bidx];
+                bool active = (bi.band_id != BAND_NOT_EXIST) && (line_idx < bi.height_lines_num);
+                if (active) {
+                    if (slot + bi.gcli_width > start) {
+                        break;
+                    }
+                    slot += bi.gcli_width;
+                }
+                bidx++;
+            }
+        }
+        uint32_t band_local = start - slot;
+
+        /* Walk this thread's [start, end) chunk, crossing band boundaries
+         * via the cursor above as needed (same structure as
+         * efc_pack_gcli_parallel(), minus the significance/pack_method
+         * branch -- data uses a single unconditional formula). */
+        uint32_t nibble_running = 0;
+        uint32_t g = start;
+        while (g < end) {
+            const SvtCudaFrameBandGeom& bi = bands[bidx];
+            uint8_t gt = gtli[bidx];
+            uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
+            const uint8_t* gcli = gcli_frame + bi.gcli_offset + (size_t)abs_row * bi.gcli_width;
+            uint32_t band_remaining = bi.gcli_width - band_local;
+            uint32_t chunk = end - g;
+            if (chunk > band_remaining) {
+                chunk = band_remaining;
+            }
+            for (uint32_t k = 0; k < chunk; k++) {
+                uint32_t li = band_local + k;
+                uint32_t nibble_count = gcli[li] > gt ? (uint32_t)(gcli[li] - gt + 1) : 0;
+                s_gcli_offsets[g + k] = (nibble_running << 5) | nibble_count;
+                nibble_running += nibble_count;
+            }
+            g += chunk;
+            band_local += chunk;
+            if (band_local == bi.gcli_width) {
+                bidx++;
+                while (bidx < band_stop) {
+                    const SvtCudaFrameBandGeom& bi2 = bands[bidx];
+                    if (bi2.band_id != BAND_NOT_EXIST && line_idx < bi2.height_lines_num) {
+                        break;
+                    }
+                    bidx++;
+                }
+                band_local = 0;
+            }
+        }
+
+        /* Warp-level exclusive scan of each thread's chunk total, then
+         * combine across the block's warps -- identical technique to
+         * efc_pack_gcli_parallel(). */
+        uint32_t scan = nibble_running;
+#pragma unroll
+        for (int offset = 1; offset < 32; offset <<= 1) {
+            uint32_t n = __shfl_up_sync(0xFFFFFFFFu, scan, offset);
+            if (lane >= (unsigned)offset) {
+                scan += n;
+            }
+        }
+        uint32_t warp_total = __shfl_sync(0xFFFFFFFFu, scan, 31);
+        uint32_t warp_exclusive = scan - nibble_running;
+        if (lane == 0) {
+            s_warp_total[warp_id] = warp_total;
+        }
+        __syncthreads();
+
+        uint32_t warp_base = 0;
+        for (unsigned w = 0; w < warp_id; w++) {
+            warp_base += s_warp_total[w];
+        }
+        uint32_t delta = (warp_base + warp_exclusive) << 5;
+        for (uint32_t gi = start; gi < end; gi++) {
+            s_gcli_offsets[gi] += delta;
+        }
+        __syncthreads();
+
+        /* Pass C: parallel scatter over this packet's groups. Each thread
+         * still needs band ownership (unlike gcli's Pass C) since it must
+         * read the real coefficient values, not just emit a fixed bit
+         * pattern. */
+        uint8_t* region = precinct_mem + header_len_bytes + packet_offset[p] + pack_header_bytes + pss[p] + psg[p];
+        for (uint32_t local = threadIdx.x; local < count; local += blockDim.x) {
+            uint32_t packed = s_gcli_offsets[local];
+            uint32_t nibble_count = packed & 0x1Fu;
+            if (nibble_count == 0) {
+                continue;
+            }
+            uint32_t nibble_off = packed >> 5;
+
+            uint32_t cur = 0;
+            uint32_t local_group = 0;
+            uint32_t owner = 0;
+            int found = 0;
+            for (uint32_t bidx = band_start; bidx < band_stop; bidx++) {
+                const SvtCudaFrameBandGeom& bi = bands[bidx];
+                if (bi.band_id == BAND_NOT_EXIST || line_idx >= bi.height_lines_num) {
+                    continue;
+                }
+                uint32_t width = bi.gcli_width;
+                if (local < cur + width) {
+                    owner = bidx;
+                    local_group = local - cur;
+                    found = 1;
+                    break;
+                }
+                cur += width;
+            }
+            if (!found) {
+                continue; /* defensive -- count accounting guarantees this doesn't happen */
+            }
+
+            const SvtCudaFrameBandGeom& bi = bands[owner];
+            uint8_t gt = gtli[owner];
+            uint32_t gcli_val = gt + nibble_count - 1; /* recovered, avoids re-reading gcli_frame */
+            uint32_t valid_lanes = 4;
+            if ((bi.width & 3u) != 0 && local_group == bi.gcli_width - 1) {
+                valid_lanes = bi.width & 3u; /* trailing leftover group */
+            }
+            uint32_t abs_row = precinct_idx * bi.height_lines_num + line_idx;
+            const uint16_t* coeff = pyramid_ptrs[bi.comp_id] + (size_t)(bi.y + abs_row) * comp_stride[bi.comp_id] + bi.x +
+                (size_t)local_group * EFC_GROUP_SIZE;
+
+            for (uint32_t k = 0; k < nibble_count; k++) {
+                uint8_t nibble = 0;
+                if (k == 0) {
+                    for (uint32_t lane = 0; lane < valid_lanes; lane++) {
+                        if (coeff[lane] & EFC_SIGN_MASK) {
+                            nibble |= (uint8_t)(1u << (3 - lane));
+                        }
+                    }
+                }
+                else {
+                    uint32_t bit_pos = gcli_val - k;
+                    for (uint32_t lane = 0; lane < valid_lanes; lane++) {
+                        if ((coeff[lane] >> bit_pos) & 1u) {
+                            nibble |= (uint8_t)(1u << (3 - lane));
+                        }
+                    }
+                }
+                efc_atomic_write_nibble(region, nibble_off + k, nibble);
+            }
+        }
+        __syncthreads(); /* before next packet's Pass A+B overwrites s_gcli_offsets */
+    }
 }
 
 /* 2026-08-26 Pack-parallelization trial: was "1 precinct = 1 block, 1
@@ -818,7 +1499,15 @@ __global__ void k_pack_precinct_frame(const SvtCudaFrameBandGeom* bands, uint32_
                                       const uint32_t* total_bytes_all, const uint32_t* padding_bytes_all,
                                       const uint32_t* out_offset_all, const uint32_t* psd_all, const uint32_t* psg_all,
                                       const uint32_t* pss_all, const uint8_t* packet_methods_raw_all,
-                                      const uint32_t* packet_offset_all, uint8_t* out_buffer, int* out_error) {
+                                      const uint32_t* packet_offset_all, const uint32_t* packet_group_base,
+                                      uint8_t* out_buffer, int* out_error) {
+    /* Phase 6: dynamic shared memory for efc_pack_gcli_parallel()'s per-group
+     * offset table -- sized by the launch site to ctx->gcli_scan_shared_bytes
+     * (see svt_cuda_frame_context_create_from_pi()). Frame-constant geometry
+     * (packet_group_base is the same array for every precinct-block), so no
+     * per-precinct indexing is needed on it, unlike gtli/psd/psg/pss below. */
+    extern __shared__ uint32_t s_gcli_offsets[];
+
     uint32_t precinct_idx = blockIdx.x;
     const uint8_t* gtli = gtli_all + (size_t)precinct_idx * bands_num_all;
     const uint8_t* pack_method = pack_method_all + (size_t)precinct_idx * bands_num_all;
@@ -888,13 +1577,43 @@ __global__ void k_pack_precinct_frame(const SvtCudaFrameBandGeom* bands, uint32_
         bw.offset = 0;
         bw.bits_used = 0;
 
-        int err = efc_pack_one_packet(&bw, bands, pyramid_ptrs, comp_stride, gcli_frame, sig_frame, gtli, pack_method,
-                                      precinct_idx, use_short_header, packets[p].band_start, packets[p].band_stop,
-                                      packets[p].line_idx, packet_methods_raw[p], psd[p], psg[p], pss[p]);
+        int err = efc_pack_one_packet(&bw, use_short_header, packet_methods_raw[p], psd[p], psg[p], pss[p]);
         if (err != 0) {
             atomicExch(out_error, err);
         }
     }
+
+    /* Phase 6 pilot: significance sub-packet content is written separately,
+     * coefficient-group-parallel across the whole block (see function
+     * comment above). Disjoint byte range from the packet loop above (that
+     * loop no longer writes any significance content, only advances past
+     * it -- see efc_pack_one_packet()), so no __syncthreads() is needed
+     * between the two loops. RAW packets have pss[p]==0 and are skipped
+     * inside efc_pack_significance_parallel() itself. */
+    efc_pack_significance_parallel(
+        precinct_mem, header_len_bytes, packets, packets_num, bands, gtli, pack_method, sig_frame, precinct_idx,
+        packet_offset, pss, use_short_header);
+
+    /* Phase 6: gcli(bitplane-count) sub-packet content, also written
+     * separately (see efc_pack_gcli_parallel()'s comment). Disjoint byte
+     * range from both the packet loop (advances past it only) and the
+     * significance pass above, so no extra __syncthreads() is needed here --
+     * efc_pack_gcli_parallel() has its own internal sync between its Pass A+B
+     * and Pass C. */
+    efc_pack_gcli_parallel(precinct_mem, header_len_bytes, packets, packets_num, bands, gtli, pack_method, gcli_frame,
+                           sig_frame, precinct_idx, packet_offset, pss, psg, packet_methods_raw, packet_group_base,
+                           use_short_header, s_gcli_offsets);
+
+    /* Phase 6: data sub-packet content, also written separately (see
+     * efc_pack_data_parallel()'s comment). Disjoint byte range from
+     * everything above (packet loop only advances past it; significance and
+     * gcli passes finish before this starts, both via __syncthreads()
+     * inside efc_pack_gcli_parallel() and this call ordering), and reuses
+     * the same s_gcli_offsets shared table now that gcli's use of it is
+     * done. */
+    efc_pack_data_parallel(precinct_mem, header_len_bytes, packets, packets_num, bands, gtli, gcli_frame, pyramid_ptrs,
+                           comp_stride, precinct_idx, packet_offset, pss, psg, psd, packet_group_base, use_short_header,
+                           s_gcli_offsets);
 }
 
 /* =====================================================================
@@ -942,6 +1661,111 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
     uint32_t precincts_num = ctx->precincts_num;
     uint32_t packets_num = ctx->packets_num;
     cudaError_t cerr = cudaSuccess;
+    bool efc_prof = efc_profile_enabled();
+
+    /* [2026-08-28] graph1 sub-phase measurement (SVT_CUDA_PROFILE=1 only).
+     * Replaces an earlier "isolated, uncaptured" NLT+DWT probe that turned
+     * out to be measuring the wrong thing: it issued ~39 individual kernel
+     * launches outside any graph capture, so its number was inflated by
+     * per-launch overhead that the real, graph-replayed path never pays --
+     * see PortingStrategy.txt Phase 6 notes for the full correction (that
+     * probe made DWT look like ~87-90% of graph1; the true share, measured
+     * the way below, may be substantially lower).
+     *
+     * This instead captures NLT+DWT and GC+RC-LUT+D2H as two SEPARATE,
+     * temporary CUDA Graphs -- each captured/instantiated/launched/synced
+     * once, right before graph1's own (real) capture below -- so both
+     * halves pay the same graph-replay characteristics as the real path,
+     * using the exact same ctx-based (persistent-buffer), all-components,
+     * real-image code paths graph1 itself uses. Only runs on the (rare)
+     * recapture call, since this is diagnostic and doesn't need to repeat
+     * every frame. These temporary graphs are local to this call and
+     * destroyed immediately after use; ctx and its persistent
+     * graph1/graph1_exec are completely untouched by this block -- the
+     * real graph1 capture right after re-runs the same kernels for real
+     * (redundant but deterministic, so harmless; only happens while
+     * profiling). cudaEvent_t-based intra-graph timing was tried first and
+     * abandoned: elapsed-time queries on events recorded via
+     * cudaGraphLaunch replay returned cudaErrorInvalidValue on this
+     * driver/toolkit combination for reasons not further investigated. */
+    if (efc_prof && efc_graph1_needs_recapture(ctx, in_planes, in_stride, decom_h, decom_v, input_bit_depth, hdr_Bw,
+                                               hdr_Fq, coding_significance)) {
+        cudaGraph_t diag_g = NULL;
+        cudaGraphExec_t diag_exec = NULL;
+        EfcProfileTimer diag_timer;
+
+        /* graph1a: NLT+DWT only (all components). */
+        if (cudaStreamBeginCapture(ctx->stream, cudaStreamCaptureModeThreadLocal) == cudaSuccess) {
+            int derr = 0;
+            for (uint32_t c = 0; c < ctx->comps_num; c++) {
+                derr = efc_run_dwt(ctx, c, in_planes[c], in_stride[c], decom_h, decom_v, input_bit_depth, hdr_Bw, hdr_Fq);
+                if (derr != 0) {
+                    break;
+                }
+            }
+            cudaStreamEndCapture(ctx->stream, &diag_g);
+            if (derr == 0 && diag_g && cudaGraphInstantiate(&diag_exec, diag_g, 0) == cudaSuccess) {
+                diag_timer.start();
+                if (cudaGraphLaunch(diag_exec, ctx->stream) == cudaSuccess) {
+                    cudaStreamSynchronize(ctx->stream);
+                }
+                fprintf(stderr, "[svt_cuda_profile]   graph1 sub-measure: NLT+DWT (own graph) = %.3f ms\n",
+                        diag_timer.stop_ms());
+                cudaGraphExecDestroy(diag_exec);
+            }
+            if (diag_g) {
+                cudaGraphDestroy(diag_g);
+            }
+        }
+
+        /* graph1b: GC+sig + RC-LUT build + D2H copy only (reads the DWT
+         * output graph1a just wrote for real above, so this operates on
+         * valid data, matching what the real graph1 would compute). */
+        diag_g = NULL;
+        diag_exec = NULL;
+        if (cudaStreamBeginCapture(ctx->stream, cudaStreamCaptureModeThreadLocal) == cudaSuccess) {
+            for (uint32_t b = 0; b < bands_num_all; b++) {
+                const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
+                if (g.band_id == BAND_NOT_EXIST || g.height == 0)
+                    continue;
+                uint32_t total_gc = g.height * g.gcli_width;
+                uint32_t threads = 256, blocks = (total_gc + threads - 1) / threads;
+                k_gc_band_frame<<<blocks, threads, 0, ctx->stream>>>(ctx->d_pyramid16[g.comp_id], ctx->comp_width[g.comp_id],
+                                                                      g.x, g.y, g.width, g.height, g.gcli_width,
+                                                                      ctx->d_gcli_frame + g.gcli_offset);
+                uint32_t total_sig = g.height * g.significance_width;
+                blocks = (total_sig + threads - 1) / threads;
+                k_sig_band_frame<<<blocks, threads, 0, ctx->stream>>>(ctx->d_gcli_frame + g.gcli_offset, g.gcli_width, g.height,
+                                                                       g.significance_width, ctx->d_sig_frame + g.sig_offset);
+            }
+            for (uint32_t b = 0; b < bands_num_all; b++) {
+                const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
+                if (g.band_id == BAND_NOT_EXIST || g.height == 0)
+                    continue;
+                uint32_t threads = 256, blocks = (g.height + threads - 1) / threads;
+                k_rc_build_lut_band_frame<<<blocks, threads, 0, ctx->stream>>>(
+                    ctx->d_gcli_frame + g.gcli_offset, ctx->d_sig_frame + g.sig_offset, g.gcli_width, g.significance_width,
+                    g.height, coding_significance, (EfcBandLineLut*)ctx->d_lut + ctx->lut_row_offset[b]);
+            }
+            if (ctx->lut_total_rows) {
+                cudaMemcpyAsync(ctx->h_lut, ctx->d_lut, (size_t)ctx->lut_total_rows * sizeof(EfcBandLineLut),
+                               cudaMemcpyDeviceToHost, ctx->stream);
+            }
+            cudaStreamEndCapture(ctx->stream, &diag_g);
+            if (diag_g && cudaGraphInstantiate(&diag_exec, diag_g, 0) == cudaSuccess) {
+                diag_timer.start();
+                if (cudaGraphLaunch(diag_exec, ctx->stream) == cudaSuccess) {
+                    cudaStreamSynchronize(ctx->stream);
+                }
+                fprintf(stderr, "[svt_cuda_profile]   graph1 sub-measure: GC+sig+RC-LUT+D2H (own graph) = %.3f ms\n",
+                        diag_timer.stop_ms());
+                cudaGraphExecDestroy(diag_exec);
+            }
+            if (diag_g) {
+                cudaGraphDestroy(diag_g);
+            }
+        }
+    }
 
     /* --- Graph 1: NLT+DWT (all components) + batched GC/significance (all
      * bands) + batched RC LUT build (all bands) + D2H copy of the LUT into
@@ -1034,7 +1858,6 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
     }
 
     EfcProfileTimer efc_prof_timer;
-    bool efc_prof = efc_profile_enabled();
     if (efc_prof)
         efc_prof_timer.start();
     if ((cerr = cudaGraphLaunch(ctx->graph1_exec, ctx->stream)) == cudaSuccess) {
@@ -1283,14 +2106,14 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
              * thread taking packets round-robin (packets_num is typically
              * well under 32 -- see plan file -- so most threads handle at
              * most one packet). */
-            const uint32_t PACK_THREADS_PER_BLOCK = 32;
-            k_pack_precinct_frame<<<precincts_num, PACK_THREADS_PER_BLOCK, 0, ctx->stream>>>(
+            const uint32_t PACK_THREADS_PER_BLOCK = 128;
+            k_pack_precinct_frame<<<precincts_num, PACK_THREADS_PER_BLOCK, ctx->gcli_scan_shared_bytes, ctx->stream>>>(
                 ctx->d_bands, bands_num_all, bands_num_exists, ctx->d_pyramid_ptrs, ctx->d_comp_stride, ctx->d_gcli_frame,
                 ctx->d_sig_frame, ctx->d_gtli, ctx->d_pack_method, packets_num, (const svt_cuda_pack_packet_t*)ctx->d_packets,
                 use_short_header, ctx->d_precinct_quantization, ctx->d_precinct_refinement, ctx->d_precinct_total_bytes,
                 ctx->d_precinct_padding_bytes, ctx->d_precinct_out_offset, ctx->d_packet_size_data_bytes,
                 ctx->d_packet_size_gcli_bytes, ctx->d_packet_size_significance_bytes, ctx->d_packet_methods_raw,
-                ctx->d_packet_offset, ctx->d_pack_out, ctx->d_error);
+                ctx->d_packet_offset, ctx->d_packet_group_base, ctx->d_pack_out, ctx->d_error);
 
             cerr = cudaMemcpyAsync(ctx->h_error, ctx->d_error, sizeof(int), cudaMemcpyDeviceToHost, ctx->stream);
         }
@@ -1325,7 +2148,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
         cerr = cudaStreamSynchronize(ctx->stream);
     }
     if (efc_prof)
-        fprintf(stderr, "[svt_cuda_profile] graph2 (quantize+pack) launch+sync: %.3f ms\n", efc_prof_timer.stop_ms());
+        fprintf(stderr, "[svt_cuda_profile] graph2 (quantize+pack) launch+sync: %.3f ms (gcli_scan_shared_bytes=%u)\n",
+               efc_prof_timer.stop_ms(), ctx->gcli_scan_shared_bytes);
     if (cerr != cudaSuccess) {
         return -(int)cerr;
     }

@@ -123,6 +123,26 @@ typedef struct SvtCudaFrameContext {
     uint32_t* d_packet_offset;   /* [precincts_num * packets_num] */
     uint32_t* h_packet_offset;   /* [precincts_num * packets_num], pinned host mirror (H2D source inside graph2) */
 
+    /* --- Phase 6: coefficient-group-parallel gcli(bitplane-count) sub-packet
+     * scatter write (see PortingStrategy.txt Phase 6 notes). gcli_scan_shared_bytes
+     * is the dynamic shared-memory size (bytes) k_pack_precinct_frame must be
+     * launched with -- one uint32_t slot per coefficient-group across ALL
+     * existing bands (sum of gcli_width), computed once in
+     * svt_cuda_frame_context_create() from the same band loop that already
+     * computes gcli_offset/sig_offset. d_packet_group_base is each packet's
+     * starting slot within that shared-memory offset table -- purely
+     * geometric (depends only on band widths, not runtime gcli values), so
+     * it is computed once in svt_cuda_frame_context_create_from_pi() (which
+     * has the packet band_start/band_stop ranges) and uploaded once, never
+     * recomputed per-frame. Both are 0/NULL (unused) for contexts created via
+     * the plain svt_cuda_frame_context_create() path used by the DWT-only
+     * tests, which never launch k_pack_precinct_frame(). */
+    uint32_t gcli_scan_shared_bytes;
+    uint32_t* d_packet_group_base; /* [packets_num + 1]; d_packet_group_base[packets_num] is a
+                                     * sentinel (= gcli_scan_shared_bytes/4) so
+                                     * d_packet_group_base[p+1]-d_packet_group_base[p] gives packet
+                                     * p's coefficient-group count without a separate array. */
+
     /* =====================================================================
      * Phase 4b-2: CUDA Graph support. Two graphs bracket the host-side RC
      * binary search (which must stay off-graph -- see plan file Phase 4b-2):

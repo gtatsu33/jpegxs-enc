@@ -220,6 +220,17 @@ int svt_cuda_dwt_component(const void* in_plane, uint32_t plane_stride, uint32_t
 
     const size_t elems = (size_t)comp_width * comp_height;
     const size_t bytes32 = elems * sizeof(int32_t);
+    /* [2026-08-28 Phase B, Step B1 -- tried, reverted] k_vertical_lift's
+     * grid size (=ceil(width/THREADS)) is small at the real 4K geometry's
+     * widest levels (15 blocks at L0, 8 at L1 with THREADS=256), which
+     * theoretically starves this GPU's SMs (worse on wider-SM-count GPUs).
+     * Swept THREADS=128/64/32 (all should proportionally raise grid size
+     * with zero change to the arithmetic path, since this kernel has no
+     * shared memory/per-block setup) and measured no change in NLT+DWT time
+     * within noise on this dev machine (RTX 2000 Ada) -- see
+     * PortingStrategy.txt Phase 6 notes for the full measurement record and
+     * discussion. Reverted to 256; kept as a documented negative result
+     * rather than silently dropped. */
     const uint32_t THREADS = 256;
 
     uint8_t* d_in_raw = NULL;
@@ -394,6 +405,9 @@ int svt_cuda_dwt_component_ctx(const void* in_plane, uint32_t plane_stride, uint
         return 1;
     }
 
+    /* [2026-08-28 Phase B, Step B1 -- tried, reverted] Must stay in lockstep
+     * with the identical constant in svt_cuda_dwt_component() above -- see
+     * that copy's comment for the full rationale and measurement record. */
     const uint32_t THREADS = 256;
     cudaError_t err = cudaSuccess;
 

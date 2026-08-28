@@ -54,6 +54,7 @@ static void fcc_free_all(SvtCudaFrameContext* ctx) {
     free(ctx->h_packets_exist);
     cudaFree(ctx->d_packet_offset);
     cudaFreeHost(ctx->h_packet_offset);
+    cudaFree(ctx->d_packet_group_base);
 
     cudaFree(ctx->d_comp_stride);
     cudaFree(ctx->d_lut);
@@ -117,6 +118,15 @@ int svt_cuda_frame_context_create(SvtCudaFrameContext* ctx, uint32_t comps_num, 
     ctx->gcli_frame_total = gcli_off;
     ctx->sig_frame_total = sig_off;
     ctx->lut_total_rows = lut_total_rows;
+    /* ctx->gcli_scan_shared_bytes is NOT computed here: a single band can
+     * appear in MULTIPLE packets (one packet per line_idx for bands with
+     * height_lines_num > 1 -- see Pi.c's packet construction), so the
+     * correct total is a sum over (packet, active band) pairs, not over
+     * bands alone. svt_cuda_frame_context_create_from_pi() -- which has the
+     * packet band_start/band_stop ranges this needs -- computes and
+     * overwrites it once it knows that count (0/unused for contexts created
+     * via this function directly, e.g. the DWT-only tests, which never
+     * launch k_pack_precinct_frame()). */
 
     ctx->h_bands = (SvtCudaFrameBandGeom*)malloc(bands_num_all * sizeof(SvtCudaFrameBandGeom));
     memcpy(ctx->h_bands, hb.data(), bands_num_all * sizeof(SvtCudaFrameBandGeom));
@@ -191,7 +201,15 @@ int svt_cuda_frame_context_create(SvtCudaFrameContext* ctx, uint32_t comps_num, 
             cudaSuccess)
             break;
 
-        if ((err = cudaMalloc(&ctx->d_pack_out, pack_out_capacity_bytes ? pack_out_capacity_bytes : 1)) != cudaSuccess)
+        /* +4 bytes of tail padding: Phase 6 pilot's significance-sub-packet
+         * scatter write (EncodeFrameCuda.cu's efc_pack_significance_parallel())
+         * ORs into the 32-bit-aligned word containing each target byte (no
+         * native 8-bit atomicOr on CUDA), which can touch up to 3 bytes past
+         * the last significance byte of the last precinct -- structurally
+         * guarantee that stays in-bounds regardless of caller-supplied
+         * capacity slack. */
+        if ((err = cudaMalloc(&ctx->d_pack_out, (pack_out_capacity_bytes ? pack_out_capacity_bytes : 1) + 4)) !=
+            cudaSuccess)
             break;
 
         /* --- Phase 4b-2: persistent scratch + pinned host mirrors, replacing

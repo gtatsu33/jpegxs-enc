@@ -1,0 +1,1573 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineSystem.cmake:218 (message)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      The system is: Windows - 10.0.26100 - AMD64
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompiler.cmake:54 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:61 (_cmake_find_compiler)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_ASM_NASM_COMPILER"
+    description: "ASM_NASM compiler"
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "nasm"
+      - "yasm"
+    candidate_directories:
+      - "C:/BuildTools2022/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/"
+    searched_directories:
+      - "C:/BuildTools2022/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/nasm.com"
+      - "C:/BuildTools2022/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/nasm.exe"
+      - "C:/BuildTools2022/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/nasm"
+      - "C:/BuildTools2022/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/yasm.com"
+      - "C:/BuildTools2022/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/yasm.exe"
+      - "C:/BuildTools2022/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/yasm"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompiler.cmake:76 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:61 (_cmake_find_compiler)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_ASM_NASM_COMPILER"
+    description: "ASM_NASM compiler"
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "nasm"
+      - "yasm"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/Program Files/NASM/"
+      - "C:/Program Files (x86)/NASM/"
+      - "C:/Users/0000108885/AppData/Local/NASM/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/nasm.com"
+    found: "C:/Users/0000108885/AppData/Local/bin/NASM/nasm.exe"
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is GNU using "--version" did not match "(GNU assembler)|(GCC)|(Free Software Foundation)":
+      NASM version 3.02 compiled on Jun 28 2026
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is AppleClang using "--version" did not match "(Apple (clang|LLVM) version)":
+      NASM version 3.02 compiled on Jun 28 2026
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is Clang using "--version" did not match "(clang version)":
+      NASM version 3.02 compiled on Jun 28 2026
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is ARMClang using "--version" did not match "armclang":
+      NASM version 3.02 compiled on Jun 28 2026
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is OrangeC using "--version" did not match "occ \\(OrangeC\\) Version":
+      NASM version 3.02 compiled on Jun 28 2026
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is HP using "-V" did not match "HP C":
+      nasm: error: unrecognised option `-V'
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is Intel using "--version" did not match "(ICC)":
+      NASM version 3.02 compiled on Jun 28 2026
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is IntelLLVM using "--version" did not match "(Intel[^
+      ]+oneAPI)":
+      NASM version 3.02 compiled on Jun 28 2026
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is SunPro using "-V" did not match "Sun C":
+      nasm: error: unrecognised option `-V'
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is XL using "-qversion" did not match "XL C":
+      nasm: error: unrecognised option `-q'
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is MSVC using "-?" did not match "Microsoft.*Macro Assembler":
+      Usage: C:/Users/0000108885/AppData/Local/bin/NASM/nasm.exe [-@ response_file] [options...] [--] filename
+        Options:
+          -v (or --v)    print the NASM version number and exit
+          -@ file        response file; one command line option per line
+          -h             list command line options and exit (also --help)
+          -h -opt        show additional help for option "-opt"
+          -h all         show all available command line help
+          -h topics      show list of help topics (also -h list)
+          -o outfile     write output to outfile
+          --keep-all     output files will not be removed even if an error happens
+          -Xformat       specify error reporting format (see -h -X)
+          -s             redirect messages to stdout
+          -Zfile         redirect messages to file
+          --info[=lvl]   display optional informational messages
+          --debug[=lvl]  display NASM internal debugging messages
+          -M...          generate Makefile dependencies (see -h -M)
+          -f format      select output file format (see -h -f)
+          -g             generate debugging information
+          -F format      select a debugging format (see -h -F)
+          -gformat       same as -g -F format
+          -l listfile    write listing to a list file
+          -Lflags...     add information to the list file (see -h -L)
+          -Oflags...     select optimization (see -h -O)
+          -t             assemble in limited SciTech TASM compatible mode
+          -E (or -e)     preprocess only (writes output to stdout by default)
+          -a             don't preprocess (assemble only)
+          -Ipath         add a pathname to the include file path
+          -Pfile         pre-include a file (also --include)
+          -Dmacro[=str]  pre-define a macro
+          -Umacro        undefine a macro
+          -w+x           enable warning x  (see -h -w)(also -Wx)
+          -w-x           disable warning x (also -Wno-x)
+          -w[+-]error    promote all warnings to errors (also -Werror)
+          -w[+-]error=x  promote warning x to errors (also -Werror=x)
+          --pragma str   pre-executes a specific %pragma
+          --before str   add line (usually a preprocessor statement) before the input
+          --bits nn      set bits to nn (equivalent to --before "BITS nn")
+          --no-line      ignore %line directives in input
+          --gprefix str  prepend the given string to the names of all extern,
+                         common and global symbols (also --prefix)
+          --gpostfix str append the given string to the names of all extern,
+                         common and global symbols (also --postfix)
+          --lprefix str  prepend the given string to local symbols
+          --lpostfix str append the given string to local symbols
+          --reproducible attempt to produce run-to-run identical output
+          --limit-* val  set execution limit (see -h --limit)
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is TI using "-h" did not match "Texas Instruments":
+      Usage: C:/Users/0000108885/AppData/Local/bin/NASM/nasm.exe [-@ response_file] [options...] [--] filename
+        Options:
+          -v (or --v)    print the NASM version number and exit
+          -@ file        response file; one command line option per line
+          -h             list command line options and exit (also --help)
+          -h -opt        show additional help for option "-opt"
+          -h all         show all available command line help
+          -h topics      show list of help topics (also -h list)
+          -o outfile     write output to outfile
+          --keep-all     output files will not be removed even if an error happens
+          -Xformat       specify error reporting format (see -h -X)
+          -s             redirect messages to stdout
+          -Zfile         redirect messages to file
+          --info[=lvl]   display optional informational messages
+          --debug[=lvl]  display NASM internal debugging messages
+          -M...          generate Makefile dependencies (see -h -M)
+          -f format      select output file format (see -h -f)
+          -g             generate debugging information
+          -F format      select a debugging format (see -h -F)
+          -gformat       same as -g -F format
+          -l listfile    write listing to a list file
+          -Lflags...     add information to the list file (see -h -L)
+          -Oflags...     select optimization (see -h -O)
+          -t             assemble in limited SciTech TASM compatible mode
+          -E (or -e)     preprocess only (writes output to stdout by default)
+          -a             don't preprocess (assemble only)
+          -Ipath         add a pathname to the include file path
+          -Pfile         pre-include a file (also --include)
+          -Dmacro[=str]  pre-define a macro
+          -Umacro        undefine a macro
+          -w+x           enable warning x  (see -h -w)(also -Wx)
+          -w-x           disable warning x (also -Wno-x)
+          -w[+-]error    promote all warnings to errors (also -Werror)
+          -w[+-]error=x  promote warning x to errors (also -Werror=x)
+          --pragma str   pre-executes a specific %pragma
+          --before str   add line (usually a preprocessor statement) before the input
+          --bits nn      set bits to nn (equivalent to --before "BITS nn")
+          --no-line      ignore %line directives in input
+          --gprefix str  prepend the given string to the names of all extern,
+                         common and global symbols (also --prefix)
+          --gpostfix str append the given string to the names of all extern,
+                         common and global symbols (also --postfix)
+          --lprefix str  prepend the given string to local symbols
+          --lpostfix str append the given string to local symbols
+          --reproducible attempt to produce run-to-run identical output
+          --limit-* val  set execution limit (see -h --limit)
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is TIClang using "--version" did not match "(TI (.*) Clang Compiler)":
+      NASM version 3.02 compiled on Jun 28 2026
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is IAR using "" did not match "IAR Assembler":
+      nasm: fatal: no input file specified
+      Usage: C:/Users/0000108885/AppData/Local/bin/NASM/nasm.exe [-@ response_file] [options...] [--] filename
+         For additional help:
+             C:/Users/0000108885/AppData/Local/bin/NASM/nasm.exe -h [run|topics|all|-option]
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is Diab using "-V" did not match "Wind River Systems":
+      nasm: error: unrecognised option `-V'
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1341 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is ARMCC using "" did not match "(ARM Compiler)|(ARM Assembler)|(Arm Compiler)":
+      nasm: fatal: no input file specified
+      Usage: C:/Users/0000108885/AppData/Local/bin/NASM/nasm.exe [-@ response_file] [options...] [--] filename
+         For additional help:
+             C:/Users/0000108885/AppData/Local/bin/NASM/nasm.exe -h [run|topics|all|-option]
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineCompilerId.cmake:1328 (message)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:174 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    message: |
+      Checking whether the ASM_NASM compiler is NASM using "-v" matched "(NASM version)":
+      NASM version 3.02 compiled on Jun 28 2026
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_AR"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ar"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/ar.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/ar.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/ar"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ar.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ar.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ar"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/ar.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/ar.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/ar"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/ar.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/ar.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/ar"
+      - "C:/Windows/System32/ar.com"
+      - "C:/Windows/System32/ar.exe"
+      - "C:/Windows/System32/ar"
+      - "C:/Windows/ar.com"
+      - "C:/Windows/ar.exe"
+      - "C:/Windows/ar"
+      - "C:/Windows/System32/wbem/ar.com"
+      - "C:/Windows/System32/wbem/ar.exe"
+      - "C:/Windows/System32/wbem/ar"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/ar.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/ar.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/ar"
+      - "C:/Windows/System32/OpenSSH/ar.com"
+      - "C:/Windows/System32/OpenSSH/ar.exe"
+      - "C:/Windows/System32/OpenSSH/ar"
+      - "C:/Program Files/dotnet/ar.com"
+      - "C:/Program Files/dotnet/ar.exe"
+      - "C:/Program Files/dotnet/ar"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/ar.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/ar.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/ar"
+      - "C:/Program Files/CMake/bin/ar.com"
+      - "C:/Program Files/CMake/bin/ar.exe"
+      - "C:/Program Files/CMake/bin/ar"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/ar.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/ar.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/ar"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/ar.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/ar.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/ar"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/ar.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/ar.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/ar"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/ar.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/ar.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/ar"
+      - "C:/Users/0000108885/.local/bin/ar.com"
+      - "C:/Users/0000108885/.local/bin/ar.exe"
+      - "C:/Users/0000108885/.local/bin/ar"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_RANLIB"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ranlib"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/ranlib.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/ranlib.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/ranlib"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ranlib.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ranlib.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ranlib"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/ranlib.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/ranlib.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/ranlib"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/ranlib.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/ranlib.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/ranlib"
+      - "C:/Windows/System32/ranlib.com"
+      - "C:/Windows/System32/ranlib.exe"
+      - "C:/Windows/System32/ranlib"
+      - "C:/Windows/ranlib.com"
+      - "C:/Windows/ranlib.exe"
+      - "C:/Windows/ranlib"
+      - "C:/Windows/System32/wbem/ranlib.com"
+      - "C:/Windows/System32/wbem/ranlib.exe"
+      - "C:/Windows/System32/wbem/ranlib"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/ranlib.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/ranlib.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/ranlib"
+      - "C:/Windows/System32/OpenSSH/ranlib.com"
+      - "C:/Windows/System32/OpenSSH/ranlib.exe"
+      - "C:/Windows/System32/OpenSSH/ranlib"
+      - "C:/Program Files/dotnet/ranlib.com"
+      - "C:/Program Files/dotnet/ranlib.exe"
+      - "C:/Program Files/dotnet/ranlib"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/ranlib.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/ranlib.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/ranlib"
+      - "C:/Program Files/CMake/bin/ranlib.com"
+      - "C:/Program Files/CMake/bin/ranlib.exe"
+      - "C:/Program Files/CMake/bin/ranlib"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/ranlib.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/ranlib.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/ranlib"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/ranlib.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/ranlib.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/ranlib"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/ranlib.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/ranlib.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/ranlib"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/ranlib.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/ranlib.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/ranlib"
+      - "C:/Users/0000108885/.local/bin/ranlib.com"
+      - "C:/Users/0000108885/.local/bin/ranlib.exe"
+      - "C:/Users/0000108885/.local/bin/ranlib"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_STRIP"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "strip"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/strip.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/strip.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/strip"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/strip.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/strip.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/strip"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/strip.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/strip.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/strip"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/strip.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/strip.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/strip"
+      - "C:/Windows/System32/strip.com"
+      - "C:/Windows/System32/strip.exe"
+      - "C:/Windows/System32/strip"
+      - "C:/Windows/strip.com"
+      - "C:/Windows/strip.exe"
+      - "C:/Windows/strip"
+      - "C:/Windows/System32/wbem/strip.com"
+      - "C:/Windows/System32/wbem/strip.exe"
+      - "C:/Windows/System32/wbem/strip"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/strip.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/strip.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/strip"
+      - "C:/Windows/System32/OpenSSH/strip.com"
+      - "C:/Windows/System32/OpenSSH/strip.exe"
+      - "C:/Windows/System32/OpenSSH/strip"
+      - "C:/Program Files/dotnet/strip.com"
+      - "C:/Program Files/dotnet/strip.exe"
+      - "C:/Program Files/dotnet/strip"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/strip.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/strip.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/strip"
+      - "C:/Program Files/CMake/bin/strip.com"
+      - "C:/Program Files/CMake/bin/strip.exe"
+      - "C:/Program Files/CMake/bin/strip"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/strip.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/strip.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/strip"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/strip.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/strip.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/strip"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/strip.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/strip.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/strip"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/strip.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/strip.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/strip"
+      - "C:/Users/0000108885/.local/bin/strip.com"
+      - "C:/Users/0000108885/.local/bin/strip.exe"
+      - "C:/Users/0000108885/.local/bin/strip"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_LINKER"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ld"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/ld.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/ld.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/ld"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ld.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ld.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ld"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/ld.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/ld.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/ld"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/ld.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/ld.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/ld"
+      - "C:/Windows/System32/ld.com"
+      - "C:/Windows/System32/ld.exe"
+      - "C:/Windows/System32/ld"
+      - "C:/Windows/ld.com"
+      - "C:/Windows/ld.exe"
+      - "C:/Windows/ld"
+      - "C:/Windows/System32/wbem/ld.com"
+      - "C:/Windows/System32/wbem/ld.exe"
+      - "C:/Windows/System32/wbem/ld"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/ld.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/ld.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/ld"
+      - "C:/Windows/System32/OpenSSH/ld.com"
+      - "C:/Windows/System32/OpenSSH/ld.exe"
+      - "C:/Windows/System32/OpenSSH/ld"
+      - "C:/Program Files/dotnet/ld.com"
+      - "C:/Program Files/dotnet/ld.exe"
+      - "C:/Program Files/dotnet/ld"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/ld.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/ld.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/ld"
+      - "C:/Program Files/CMake/bin/ld.com"
+      - "C:/Program Files/CMake/bin/ld.exe"
+      - "C:/Program Files/CMake/bin/ld"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/ld.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/ld.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/ld"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/ld.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/ld.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/ld"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/ld.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/ld.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/ld"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/ld.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/ld.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/ld"
+      - "C:/Users/0000108885/.local/bin/ld.com"
+      - "C:/Users/0000108885/.local/bin/ld.exe"
+      - "C:/Users/0000108885/.local/bin/ld"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_NM"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "nm"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/nm.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/nm.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/nm"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/nm.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/nm.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/nm"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/nm.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/nm.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/nm"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/nm.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/nm.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/nm"
+      - "C:/Windows/System32/nm.com"
+      - "C:/Windows/System32/nm.exe"
+      - "C:/Windows/System32/nm"
+      - "C:/Windows/nm.com"
+      - "C:/Windows/nm.exe"
+      - "C:/Windows/nm"
+      - "C:/Windows/System32/wbem/nm.com"
+      - "C:/Windows/System32/wbem/nm.exe"
+      - "C:/Windows/System32/wbem/nm"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/nm.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/nm.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/nm"
+      - "C:/Windows/System32/OpenSSH/nm.com"
+      - "C:/Windows/System32/OpenSSH/nm.exe"
+      - "C:/Windows/System32/OpenSSH/nm"
+      - "C:/Program Files/dotnet/nm.com"
+      - "C:/Program Files/dotnet/nm.exe"
+      - "C:/Program Files/dotnet/nm"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/nm.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/nm.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/nm"
+      - "C:/Program Files/CMake/bin/nm.com"
+      - "C:/Program Files/CMake/bin/nm.exe"
+      - "C:/Program Files/CMake/bin/nm"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/nm.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/nm.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/nm"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/nm.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/nm.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/nm"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/nm.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/nm.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/nm"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/nm.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/nm.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/nm"
+      - "C:/Users/0000108885/.local/bin/nm.com"
+      - "C:/Users/0000108885/.local/bin/nm.exe"
+      - "C:/Users/0000108885/.local/bin/nm"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_OBJDUMP"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "objdump"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/objdump.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/objdump.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/objdump"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/objdump.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/objdump.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/objdump"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/objdump.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/objdump.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/objdump"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/objdump.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/objdump.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/objdump"
+      - "C:/Windows/System32/objdump.com"
+      - "C:/Windows/System32/objdump.exe"
+      - "C:/Windows/System32/objdump"
+      - "C:/Windows/objdump.com"
+      - "C:/Windows/objdump.exe"
+      - "C:/Windows/objdump"
+      - "C:/Windows/System32/wbem/objdump.com"
+      - "C:/Windows/System32/wbem/objdump.exe"
+      - "C:/Windows/System32/wbem/objdump"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/objdump.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/objdump.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/objdump"
+      - "C:/Windows/System32/OpenSSH/objdump.com"
+      - "C:/Windows/System32/OpenSSH/objdump.exe"
+      - "C:/Windows/System32/OpenSSH/objdump"
+      - "C:/Program Files/dotnet/objdump.com"
+      - "C:/Program Files/dotnet/objdump.exe"
+      - "C:/Program Files/dotnet/objdump"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/objdump.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/objdump.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/objdump"
+      - "C:/Program Files/CMake/bin/objdump.com"
+      - "C:/Program Files/CMake/bin/objdump.exe"
+      - "C:/Program Files/CMake/bin/objdump"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/objdump.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/objdump.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/objdump"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/objdump.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/objdump.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/objdump"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/objdump.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/objdump.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/objdump"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/objdump.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/objdump.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/objdump"
+      - "C:/Users/0000108885/.local/bin/objdump.com"
+      - "C:/Users/0000108885/.local/bin/objdump.exe"
+      - "C:/Users/0000108885/.local/bin/objdump"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_OBJCOPY"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "objcopy"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/objcopy.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/objcopy.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/objcopy"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/objcopy.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/objcopy.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/objcopy"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/objcopy.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/objcopy.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/objcopy"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/objcopy.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/objcopy.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/objcopy"
+      - "C:/Windows/System32/objcopy.com"
+      - "C:/Windows/System32/objcopy.exe"
+      - "C:/Windows/System32/objcopy"
+      - "C:/Windows/objcopy.com"
+      - "C:/Windows/objcopy.exe"
+      - "C:/Windows/objcopy"
+      - "C:/Windows/System32/wbem/objcopy.com"
+      - "C:/Windows/System32/wbem/objcopy.exe"
+      - "C:/Windows/System32/wbem/objcopy"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/objcopy.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/objcopy.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/objcopy"
+      - "C:/Windows/System32/OpenSSH/objcopy.com"
+      - "C:/Windows/System32/OpenSSH/objcopy.exe"
+      - "C:/Windows/System32/OpenSSH/objcopy"
+      - "C:/Program Files/dotnet/objcopy.com"
+      - "C:/Program Files/dotnet/objcopy.exe"
+      - "C:/Program Files/dotnet/objcopy"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/objcopy.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/objcopy.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/objcopy"
+      - "C:/Program Files/CMake/bin/objcopy.com"
+      - "C:/Program Files/CMake/bin/objcopy.exe"
+      - "C:/Program Files/CMake/bin/objcopy"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/objcopy.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/objcopy.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/objcopy"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/objcopy.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/objcopy.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/objcopy"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/objcopy.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/objcopy.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/objcopy"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/objcopy.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/objcopy.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/objcopy"
+      - "C:/Users/0000108885/.local/bin/objcopy.com"
+      - "C:/Users/0000108885/.local/bin/objcopy.exe"
+      - "C:/Users/0000108885/.local/bin/objcopy"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_READELF"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "readelf"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/readelf.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/readelf.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/readelf"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/readelf.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/readelf.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/readelf"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/readelf.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/readelf.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/readelf"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/readelf.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/readelf.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/readelf"
+      - "C:/Windows/System32/readelf.com"
+      - "C:/Windows/System32/readelf.exe"
+      - "C:/Windows/System32/readelf"
+      - "C:/Windows/readelf.com"
+      - "C:/Windows/readelf.exe"
+      - "C:/Windows/readelf"
+      - "C:/Windows/System32/wbem/readelf.com"
+      - "C:/Windows/System32/wbem/readelf.exe"
+      - "C:/Windows/System32/wbem/readelf"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/readelf.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/readelf.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/readelf"
+      - "C:/Windows/System32/OpenSSH/readelf.com"
+      - "C:/Windows/System32/OpenSSH/readelf.exe"
+      - "C:/Windows/System32/OpenSSH/readelf"
+      - "C:/Program Files/dotnet/readelf.com"
+      - "C:/Program Files/dotnet/readelf.exe"
+      - "C:/Program Files/dotnet/readelf"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/readelf.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/readelf.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/readelf"
+      - "C:/Program Files/CMake/bin/readelf.com"
+      - "C:/Program Files/CMake/bin/readelf.exe"
+      - "C:/Program Files/CMake/bin/readelf"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/readelf.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/readelf.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/readelf"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/readelf.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/readelf.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/readelf"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/readelf.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/readelf.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/readelf"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/readelf.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/readelf.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/readelf"
+      - "C:/Users/0000108885/.local/bin/readelf.com"
+      - "C:/Users/0000108885/.local/bin/readelf.exe"
+      - "C:/Users/0000108885/.local/bin/readelf"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_DLLTOOL"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "dlltool"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/dlltool.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/dlltool.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/dlltool"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/dlltool.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/dlltool.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/dlltool"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/dlltool.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/dlltool.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/dlltool"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/dlltool.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/dlltool.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/dlltool"
+      - "C:/Windows/System32/dlltool.com"
+      - "C:/Windows/System32/dlltool.exe"
+      - "C:/Windows/System32/dlltool"
+      - "C:/Windows/dlltool.com"
+      - "C:/Windows/dlltool.exe"
+      - "C:/Windows/dlltool"
+      - "C:/Windows/System32/wbem/dlltool.com"
+      - "C:/Windows/System32/wbem/dlltool.exe"
+      - "C:/Windows/System32/wbem/dlltool"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/dlltool.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/dlltool.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/dlltool"
+      - "C:/Windows/System32/OpenSSH/dlltool.com"
+      - "C:/Windows/System32/OpenSSH/dlltool.exe"
+      - "C:/Windows/System32/OpenSSH/dlltool"
+      - "C:/Program Files/dotnet/dlltool.com"
+      - "C:/Program Files/dotnet/dlltool.exe"
+      - "C:/Program Files/dotnet/dlltool"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/dlltool.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/dlltool.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/dlltool"
+      - "C:/Program Files/CMake/bin/dlltool.com"
+      - "C:/Program Files/CMake/bin/dlltool.exe"
+      - "C:/Program Files/CMake/bin/dlltool"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/dlltool.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/dlltool.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/dlltool"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/dlltool.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/dlltool.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/dlltool"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/dlltool.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/dlltool.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/dlltool"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/dlltool.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/dlltool.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/dlltool"
+      - "C:/Users/0000108885/.local/bin/dlltool.com"
+      - "C:/Users/0000108885/.local/bin/dlltool.exe"
+      - "C:/Users/0000108885/.local/bin/dlltool"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_ADDR2LINE"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "addr2line"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/addr2line.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/addr2line.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/addr2line"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/addr2line.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/addr2line.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/addr2line"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/addr2line.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/addr2line.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/addr2line"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/addr2line.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/addr2line.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/addr2line"
+      - "C:/Windows/System32/addr2line.com"
+      - "C:/Windows/System32/addr2line.exe"
+      - "C:/Windows/System32/addr2line"
+      - "C:/Windows/addr2line.com"
+      - "C:/Windows/addr2line.exe"
+      - "C:/Windows/addr2line"
+      - "C:/Windows/System32/wbem/addr2line.com"
+      - "C:/Windows/System32/wbem/addr2line.exe"
+      - "C:/Windows/System32/wbem/addr2line"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/addr2line.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/addr2line.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/addr2line"
+      - "C:/Windows/System32/OpenSSH/addr2line.com"
+      - "C:/Windows/System32/OpenSSH/addr2line.exe"
+      - "C:/Windows/System32/OpenSSH/addr2line"
+      - "C:/Program Files/dotnet/addr2line.com"
+      - "C:/Program Files/dotnet/addr2line.exe"
+      - "C:/Program Files/dotnet/addr2line"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/addr2line.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/addr2line.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/addr2line"
+      - "C:/Program Files/CMake/bin/addr2line.com"
+      - "C:/Program Files/CMake/bin/addr2line.exe"
+      - "C:/Program Files/CMake/bin/addr2line"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/addr2line.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/addr2line.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/addr2line"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/addr2line.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/addr2line.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/addr2line"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/addr2line.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/addr2line.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/addr2line"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/addr2line.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/addr2line.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/addr2line"
+      - "C:/Users/0000108885/.local/bin/addr2line.com"
+      - "C:/Users/0000108885/.local/bin/addr2line.exe"
+      - "C:/Users/0000108885/.local/bin/addr2line"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeFindBinUtils.cmake:247 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASMCompiler.cmake:270 (include)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeDetermineASM_NASMCompiler.cmake:22 (include)"
+      - "CMakeLists.txt:17 (project)"
+    mode: "program"
+    variable: "CMAKE_TAPI"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "tapi"
+    candidate_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/"
+      - "C:/Program Files/CMake/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/"
+      - "C:/Users/0000108885/.local/bin/"
+    searched_directories:
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/tapi.com"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/tapi.exe"
+      - "C:/Users/0000108885/AppData/Local/bin/NASM/tapi"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/tapi.com"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/tapi.exe"
+      - "C:/BuildTools2022/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/tapi"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/tapi.com"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/tapi.exe"
+      - "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/tapi"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/tapi.com"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/tapi.exe"
+      - "C:/Program Files/Microsoft SDKs/Azure/CLI2/wbin/tapi"
+      - "C:/Windows/System32/tapi.com"
+      - "C:/Windows/System32/tapi.exe"
+      - "C:/Windows/System32/tapi"
+      - "C:/Windows/tapi.com"
+      - "C:/Windows/tapi.exe"
+      - "C:/Windows/tapi"
+      - "C:/Windows/System32/wbem/tapi.com"
+      - "C:/Windows/System32/wbem/tapi.exe"
+      - "C:/Windows/System32/wbem/tapi"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/tapi.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/tapi.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/tapi"
+      - "C:/Windows/System32/OpenSSH/tapi.com"
+      - "C:/Windows/System32/OpenSSH/tapi.exe"
+      - "C:/Windows/System32/OpenSSH/tapi"
+      - "C:/Program Files/dotnet/tapi.com"
+      - "C:/Program Files/dotnet/tapi.exe"
+      - "C:/Program Files/dotnet/tapi"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/tapi.com"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/tapi.exe"
+      - "C:/Siemens/NX2312/CAPITALINTEGRATION/capitalnxremote/tapi"
+      - "C:/Program Files/CMake/bin/tapi.com"
+      - "C:/Program Files/CMake/bin/tapi.exe"
+      - "C:/Program Files/CMake/bin/tapi"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/tapi.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/tapi.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Python/Launcher/tapi"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/tapi.com"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/tapi.exe"
+      - "C:/Users/0000108885/AppData/Local/Microsoft/WindowsApps/tapi"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/tapi.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/tapi.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Microsoft VS Code/bin/tapi"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/tapi.com"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/tapi.exe"
+      - "C:/Users/0000108885/AppData/Local/Programs/Git/cmd/tapi"
+      - "C:/Users/0000108885/.local/bin/tapi.com"
+      - "C:/Users/0000108885/.local/bin/tapi.exe"
+      - "C:/Users/0000108885/.local/bin/tapi"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "C:\\BuildTools2022\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\WINDOWS\\system32"
+        - "C:\\WINDOWS"
+        - "C:\\WINDOWS\\System32\\Wbem"
+        - "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\WINDOWS\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Siemens\\NX2312\\CAPITALINTEGRATION\\capitalnxremote\\"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\0000108885\\AppData\\Local\\Programs\\Git\\cmd"
+        - "C:\\Users\\0000108885\\.local\\bin "
+...
