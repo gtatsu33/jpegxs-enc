@@ -580,40 +580,46 @@ static uint32_t efc_compute_budget_bytes(uint32_t bands_num, const SvtCudaFrameB
  * 6. Batched quantization (one launch per band, whole frame height).
  * ===================================================================== */
 
+/* [2026-08-28 graph2 optimization] Was "1 thread = 1 row, serial for loop
+ * over width" -- the same naive shape DWT's k_horizontal_lift had before
+ * Phase 4c's tiling. Unlike DWT lifting, each coefficient here is fully
+ * independent (no cross-element dependency), so this needs none of DWT's
+ * shared-memory/multi-phase machinery -- a straight 1-thread-per-element 2D
+ * grid (same dim3 block2d(32,8) convention as k_nlt_scale_8bit/_16bit and
+ * k_image_shift in DwtCuda.cu) parallelizes the width dimension too. Math/
+ * branches below are byte-for-byte unchanged from the pre-optimization
+ * version; only the index computation and loop structure changed. */
 __global__ void k_quantize_band_frame(uint16_t* pyramid, uint32_t stride, uint32_t bx, uint32_t by, uint32_t width,
                                       uint32_t height, uint32_t gcli_width, const uint8_t* gcli, uint32_t height_lines_num,
                                       const uint8_t* gtli_per_precinct /* [precincts_num] for this band */,
                                       uint8_t quant_type) {
-    uint32_t row = blockIdx.x * blockDim.x + threadIdx.x;
-    if (row >= height)
+    uint32_t col = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t row = blockIdx.y * blockDim.y + threadIdx.y;
+    if (col >= width || row >= height)
         return;
     uint32_t precinct_idx = row / height_lines_num;
     uint8_t gtli = gtli_per_precinct[precinct_idx];
     if (gtli == 0)
         return;
 
-    const uint8_t* gcli_row = gcli + (size_t)row * gcli_width;
-    uint16_t* coeff_row = pyramid + (size_t)(by + row) * stride + bx;
-
-    for (uint32_t i = 0; i < width; i++) {
-        uint8_t g = gcli_row[i / EFC_GROUP_SIZE];
-        if (g <= gtli) {
-            coeff_row[i] = 0;
-            continue;
-        }
-        uint16_t sign = coeff_row[i] & EFC_SIGN_MASK;
-        uint16_t mag = coeff_row[i] & ~EFC_SIGN_MASK;
-        uint16_t out_mag;
-        if (quant_type == 0) {
-            out_mag = (uint16_t)((mag >> gtli) << gtli);
-        }
-        else {
-            uint16_t scale_value = (uint16_t)(g - gtli + 1);
-            uint16_t d = (uint16_t)(((mag << scale_value) - mag + (1 << g)) >> (g + 1));
-            out_mag = (uint16_t)(d << gtli);
-        }
-        coeff_row[i] = out_mag ? (out_mag | sign) : 0;
+    uint8_t g = gcli[(size_t)row * gcli_width + col / EFC_GROUP_SIZE];
+    uint16_t* coeff = pyramid + (size_t)(by + row) * stride + (bx + col);
+    if (g <= gtli) {
+        *coeff = 0;
+        return;
     }
+    uint16_t sign = *coeff & EFC_SIGN_MASK;
+    uint16_t mag = *coeff & ~EFC_SIGN_MASK;
+    uint16_t out_mag;
+    if (quant_type == 0) {
+        out_mag = (uint16_t)((mag >> gtli) << gtli);
+    }
+    else {
+        uint16_t scale_value = (uint16_t)(g - gtli + 1);
+        uint16_t d = (uint16_t)(((mag << scale_value) - mag + (1 << g)) >> (g + 1));
+        out_mag = (uint16_t)(d << gtli);
+    }
+    *coeff = out_mag ? (out_mag | sign) : 0;
 }
 
 /* =====================================================================
@@ -2033,6 +2039,152 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
         return 1;
     }
 
+    /* [2026-08-28] graph2 sub-phase measurement (SVT_CUDA_PROFILE=1 only),
+     * same technique as the graph1 sub-measure above: two SEPARATE, temporary
+     * CUDA Graphs (H2D+quantize, then pack) captured/instantiated/launched/
+     * synced once right before graph2's own (real) capture below, so both
+     * halves pay the same graph-replay characteristics as the real path.
+     * Quantize (k_quantize_band_frame) zeroes below-threshold coefficients
+     * in d_pyramid16 in place; running it here for real is idempotent (the
+     * real graph2 capture below re-runs the identical, deterministic
+     * zeroing), matching the graph1a/b "redundant but harmless" precedent.
+     * Only runs on the (rare) recapture call. */
+    if (efc_prof && efc_graph2_needs_recapture(ctx, quant_type, use_short_header)) {
+        cudaGraph_t diag_g = NULL;
+        cudaGraphExec_t diag_exec = NULL;
+        EfcProfileTimer diag_timer;
+        size_t pb_bytes = (size_t)precincts_num * bands_num_all;
+        size_t pp_elems = (size_t)precincts_num * packets_num;
+
+        /* graph2a: H2D upload of RC results (all of it -- pack needs most of
+         * these buffers too, and uploading them here mirrors what the real
+         * graph2 capture does) + batched quantize (all bands) only. */
+        if (cudaStreamBeginCapture(ctx->stream, cudaStreamCaptureModeThreadLocal) == cudaSuccess) {
+            cudaError_t derr = cudaMemcpyAsync(ctx->d_gtli, ctx->h_gtli, pb_bytes, cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(ctx->d_pack_method, ctx->h_pack_method, pb_bytes, cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(
+                    ctx->d_packet_methods_raw, ctx->h_packet_methods_raw, pp_elems, cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(ctx->d_packet_offset, ctx->h_packet_offset, pp_elems * sizeof(uint32_t),
+                                       cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(
+                    ctx->d_packet_size_data_bytes, ctx->h_psd, pp_elems * sizeof(uint32_t), cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(
+                    ctx->d_packet_size_gcli_bytes, ctx->h_psg, pp_elems * sizeof(uint32_t), cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(ctx->d_packet_size_significance_bytes, ctx->h_pss, pp_elems * sizeof(uint32_t),
+                                       cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(ctx->d_precinct_quantization, ctx->h_quant, precincts_num, cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(ctx->d_precinct_refinement, ctx->h_refine, precincts_num, cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(ctx->d_precinct_total_bytes, ctx->h_total_bytes, precincts_num * sizeof(uint32_t),
+                                       cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(ctx->d_precinct_padding_bytes, ctx->h_padding_bytes, precincts_num * sizeof(uint32_t),
+                                       cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(ctx->d_precinct_out_offset, ctx->h_out_offset, precincts_num * sizeof(uint32_t),
+                                       cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess)
+                derr = cudaMemcpyAsync(ctx->d_gtli_per_band, ctx->h_gtli_per_band, pb_bytes, cudaMemcpyHostToDevice, ctx->stream);
+            if (derr == cudaSuccess) {
+                for (uint32_t b = 0; b < bands_num_all; b++) {
+                    const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
+                    if (g.band_id == BAND_NOT_EXIST || g.height == 0)
+                        continue;
+                    dim3 quant_block2d(32, 8);
+                    dim3 quant_grid2d((g.width + quant_block2d.x - 1) / quant_block2d.x,
+                                      (g.height + quant_block2d.y - 1) / quant_block2d.y);
+                    k_quantize_band_frame<<<quant_grid2d, quant_block2d, 0, ctx->stream>>>(
+                        ctx->d_pyramid16[g.comp_id], ctx->comp_width[g.comp_id], g.x, g.y, g.width, g.height, g.gcli_width,
+                        ctx->d_gcli_frame + g.gcli_offset, g.height_lines_num, ctx->d_gtli_per_band + (size_t)b * precincts_num,
+                        quant_type);
+                }
+            }
+            cudaStreamEndCapture(ctx->stream, &diag_g);
+            if (derr == cudaSuccess && diag_g && cudaGraphInstantiate(&diag_exec, diag_g, 0) == cudaSuccess) {
+                diag_timer.start();
+                if (cudaGraphLaunch(diag_exec, ctx->stream) == cudaSuccess) {
+                    cudaStreamSynchronize(ctx->stream);
+                }
+                fprintf(stderr, "[svt_cuda_profile]   graph2 sub-measure: H2D+quantize (own graph) = %.3f ms\n",
+                        diag_timer.stop_ms());
+                cudaGraphExecDestroy(diag_exec);
+            }
+            if (diag_g) {
+                cudaGraphDestroy(diag_g);
+            }
+        }
+
+        /* graph2a2: quantize only, further isolating graph2a's H2D-vs-kernel
+         * split (reuses the buffers graph2a already uploaded for real just
+         * above -- re-running quantize is idempotent, see the block comment
+         * at the top of this diagnostic section). */
+        diag_g = NULL;
+        diag_exec = NULL;
+        if (cudaStreamBeginCapture(ctx->stream, cudaStreamCaptureModeThreadLocal) == cudaSuccess) {
+            for (uint32_t b = 0; b < bands_num_all; b++) {
+                const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
+                if (g.band_id == BAND_NOT_EXIST || g.height == 0)
+                    continue;
+                dim3 quant_block2d(32, 8);
+                dim3 quant_grid2d((g.width + quant_block2d.x - 1) / quant_block2d.x,
+                                  (g.height + quant_block2d.y - 1) / quant_block2d.y);
+                k_quantize_band_frame<<<quant_grid2d, quant_block2d, 0, ctx->stream>>>(
+                    ctx->d_pyramid16[g.comp_id], ctx->comp_width[g.comp_id], g.x, g.y, g.width, g.height, g.gcli_width,
+                    ctx->d_gcli_frame + g.gcli_offset, g.height_lines_num, ctx->d_gtli_per_band + (size_t)b * precincts_num,
+                    quant_type);
+            }
+            cudaStreamEndCapture(ctx->stream, &diag_g);
+            if (diag_g && cudaGraphInstantiate(&diag_exec, diag_g, 0) == cudaSuccess) {
+                diag_timer.start();
+                if (cudaGraphLaunch(diag_exec, ctx->stream) == cudaSuccess) {
+                    cudaStreamSynchronize(ctx->stream);
+                }
+                fprintf(stderr, "[svt_cuda_profile]   graph2 sub-measure: quantize only (own graph, %u band launches) = %.3f ms\n",
+                        bands_num_all, diag_timer.stop_ms());
+                cudaGraphExecDestroy(diag_exec);
+            }
+            if (diag_g) {
+                cudaGraphDestroy(diag_g);
+            }
+        }
+
+        /* graph2b: pack only (reads the now-quantized d_pyramid16 and the
+         * RC-result buffers graph2a just uploaded for real above). */
+        diag_g = NULL;
+        diag_exec = NULL;
+        if (cudaStreamBeginCapture(ctx->stream, cudaStreamCaptureModeThreadLocal) == cudaSuccess) {
+            cudaMemsetAsync(ctx->d_error, 0, sizeof(int), ctx->stream);
+            const uint32_t PACK_THREADS_PER_BLOCK = 128;
+            k_pack_precinct_frame<<<precincts_num, PACK_THREADS_PER_BLOCK, ctx->gcli_scan_shared_bytes, ctx->stream>>>(
+                ctx->d_bands, bands_num_all, bands_num_exists, ctx->d_pyramid_ptrs, ctx->d_comp_stride, ctx->d_gcli_frame,
+                ctx->d_sig_frame, ctx->d_gtli, ctx->d_pack_method, packets_num, (const svt_cuda_pack_packet_t*)ctx->d_packets,
+                use_short_header, ctx->d_precinct_quantization, ctx->d_precinct_refinement, ctx->d_precinct_total_bytes,
+                ctx->d_precinct_padding_bytes, ctx->d_precinct_out_offset, ctx->d_packet_size_data_bytes,
+                ctx->d_packet_size_gcli_bytes, ctx->d_packet_size_significance_bytes, ctx->d_packet_methods_raw,
+                ctx->d_packet_offset, ctx->d_packet_group_base, ctx->d_pack_out, ctx->d_error);
+            cudaStreamEndCapture(ctx->stream, &diag_g);
+            if (diag_g && cudaGraphInstantiate(&diag_exec, diag_g, 0) == cudaSuccess) {
+                diag_timer.start();
+                if (cudaGraphLaunch(diag_exec, ctx->stream) == cudaSuccess) {
+                    cudaStreamSynchronize(ctx->stream);
+                }
+                fprintf(stderr, "[svt_cuda_profile]   graph2 sub-measure: pack (own graph) = %.3f ms\n", diag_timer.stop_ms());
+                cudaGraphExecDestroy(diag_exec);
+            }
+            if (diag_g) {
+                cudaGraphDestroy(diag_g);
+            }
+        }
+    }
+
     /* --- Graph 2: H2D upload of RC results, batched quantize (all bands),
      * batched pack (all precincts), D2H copy of the pack error flag.
      * Captured once, replayed on every call after that. --- */
@@ -2091,8 +2243,10 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
                 const SvtCudaFrameBandGeom& g = ctx->h_bands[b];
                 if (g.band_id == BAND_NOT_EXIST || g.height == 0)
                     continue;
-                uint32_t threads = 256, blocks = (g.height + threads - 1) / threads;
-                k_quantize_band_frame<<<blocks, threads, 0, ctx->stream>>>(
+                dim3 quant_block2d(32, 8);
+                dim3 quant_grid2d((g.width + quant_block2d.x - 1) / quant_block2d.x,
+                                  (g.height + quant_block2d.y - 1) / quant_block2d.y);
+                k_quantize_band_frame<<<quant_grid2d, quant_block2d, 0, ctx->stream>>>(
                     ctx->d_pyramid16[g.comp_id], ctx->comp_width[g.comp_id], g.x, g.y, g.width, g.height, g.gcli_width,
                     ctx->d_gcli_frame + g.gcli_offset, g.height_lines_num, ctx->d_gtli_per_band + (size_t)b * precincts_num,
                     quant_type);

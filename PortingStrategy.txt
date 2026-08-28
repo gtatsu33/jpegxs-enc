@@ -1399,3 +1399,515 @@ Phaseごとの実装手順の詳細は上記の計画ファイル側を参照す
   未充足問題が深刻なため、実機でも同様に無効なのか、実は実機でこそ
   効果が出るのかは未確認のまま。実機が確保でき次第、Step B1の再検証
   (THREADS=256/128/64/32の再比較)を最優先で行う価値がある。
+
+  [2026-08-28 TODO4実施: 実機RTX 5070 Tiでのtestdata実測 ── 16ms理想目標は
+  実機でも未達、「×3推定」は裏付けられず(正直な記録)]
+  作業機がRTX 5070 Ti搭載機に切り替わったため(`nvidia-smi`で実機であることを
+  確認済み)、TODO4に着手した。この機にはCUDA Toolkit 13.3・VS2022 BuildTools
+  (MSVC 14.44、開発機と同一バージョン)が導入済みで、`build_cuda`
+  (このマシンのパスで構成済み、`CMAKE_CUDA_ARCHITECTURES`はCMakeLists.txtの
+  デフォルト120=Blackwell向けのまま)を最新コミット(`9bbcb8b`、Phase6全体+
+  Step B1まで含む)で再ビルドした。`*Cuda*`テスト31/31 pass(bit-exact、
+  無回帰)を確認したうえで、`SvtJpegxsSampleEncoderCuda`により`testdata/`
+  配下3ファイルを各3回試行で実測した(全ケースbit-exact match: YES):
+
+    chart_color_*.ppm (3840x2160, 10bit RGB):
+      CPU 56.0/58.0/58.0 ms(平均約57.3ms)
+      CUDA warm 21.0/21.0/21.0 ms(平均約21.0ms)、speedup 約2.7〜3.0x
+    eval_fantom1_*.ppm (3840x2160, 10bit RGB):
+      CPU 59.0/61.0/63.0 ms(平均約61.0ms)
+      CUDA warm 20.0/21.0/21.0 ms(平均約20.7ms)、speedup 約2.9〜3.0x
+    test_1920x1080_yuv422p8.yuv (1920x1080, 8bit):
+      CPU 13.0/14.0/14.0 ms(平均約13.7ms)
+      CUDA warm 6.0/6.0/7.0 ms(平均約6.3ms)、speedup 約2.0〜2.3x
+
+  **結論: 33ms現実目標は実機でも大きな余裕で達成。一方16ms理想目標は実機でも
+  未達(4K画像でCUDA warm約21ms > 16ms)。** これは2026-08-28注記で示した
+  「実機は開発機の演算性能比3.7倍・帯域比4.0倍だからだいたい3倍速いはず」
+  という粗い推定が、少なくとも4K画像のwarm全体レイテンシに関しては裏付けられ
+  なかったことを意味する。開発機での同一ツール・同一testdataでの過去計測
+  (セクション12「[2026-08-26 testdata実行速度プロファイル取得]」、
+  chart_color CUDA 23.0ms)と比べると実機は約21.0msで、確かに速くはなっているが
+  倍率は約1.1倍程度にとどまり、期待した3倍とは大きく異なる。
+
+  ただし本比較には交絡がある点を正直に記録する: 開発機側の23.0msという数値は
+  **Phase6(パケットパッキングの係数グループ単位並列化)より前**の計測であり、
+  今回の実機測定は最新コミット(Phase6+Step B1まで適用済み)でのコードである。
+  つまり今回の1回の比較だけでは「GPU世代差(ハードウェア)の効果」と
+  「Phase6のコード改善の効果」を分離できていない。それでも、DWT
+  (帯域律速、セクション8 Phase B調査で確認済み)がgraph1の8割超を占める
+  ボトルネックであり続けている以上、期待した帯域比4倍のスケーリングが
+  そのまま出ていない可能性が高いと考えられる(未検証の仮説)。
+
+  **Step B1(`k_vertical_lift`のTHREADS再検証)への示唆**: 今回はTHREADS=256
+  (復元済みの既定値)のままでの全体レイテンシのみを計測し、Step B1で試した
+  THREADS=128/64/32の実機再検証は今回のスコープには含めていない
+  (未着手)。開発機で「効果ゼロ」だった一方、実機はSM数が多く
+  (70 SM、開発機22 SMの約3.2倍)grid未充足問題がより深刻なはずという
+  理論的な非対称性は解消されていないため、この再検証自体の価値は残る。
+
+  次の一歩の候補(未着手、いずれも本セッションのスコープ外):
+  (1) 実機でのTHREADS再検証(Step B1の当初目的の完了)、
+  (2) 実機でのgraph1/graph2内訳計測(`SVT_CUDA_PROFILE=1`、開発機で
+  行ったのと同様の分割グラフ計測)によりDWT/Pack双方の実機での相対比重を
+  確認すること、(3) Step B2(`k_image_shift`インライン融合)への着手。
+
+  [2026-08-28 実機でのgraph1/graph2内訳計測 ── graph1はほぼ帯域比どおりに
+  スケールしたが、atomicOr中心のgraph2はスケーリングが鈍く、実機では
+  むしろPackの比重が増した]
+  上記(2)を実施した。`SVT_CUDA_PROFILE=1`でchart_color実画像をwarm状態
+  (2回目呼び出し)で3回試行し、開発機(RTX 2000 Ada、Phase6完了時点、本節
+  「dataサブパケットの係数グループ単位並列化完了」記載の数値)と比較した:
+
+    区間                          開発機(RTX 2000 Ada)  実機(RTX 5070 Ti)  倍率
+    graph1(DWT+NLT+GC+RC-LUT)     約15.49ms              約7.97ms           約1.95x
+    host RC二分探索(CPU側)        約2.16ms               約1.17ms           約1.85x
+    graph2(量子化+Pack)           約16.02ms              約12.40ms          約1.29x
+    合計(warm)                    約33.7ms               約21.5ms           約1.57x
+
+  → **graph1(帯域律速のDWTが支配的)は約2倍というスケーリングを示し、
+  帯域比(約4倍)には届かないもののそれなりに実機の性能向上を反映している。
+  一方graph2(`atomicOr`によるscatter書き込みが中心のPack)はわずか約1.3倍
+  にしかスケールしていない。** これが「実機は演算/帯域比からだいたい3倍
+  速いはず」という2026-08-28注記の粗い推定が総合レイテンシで裏付けられ
+  なかった主因と考えられる(未検証だが妥当性の高い仮説): atomic書き込みの
+  競合はSM数・帯域が増えても解消されないため、単純な演算/帯域律速カーネル
+  ほどにはスケールしない。
+  副次的な結果として、**graph2が全体に占める比率は開発機の約47.5%
+  (16.02/33.7ms)から実機では約58%(12.40/21.5ms)へ増加しており、実機では
+  Pack側の最適化の優先度が開発機での分析時よりも相対的に高くなっている。**
+
+  [2026-08-28 Step B1(`k_vertical_lift`のTHREADS再検証)を実機で再実施 ──
+  実機でも効果なし、開発機と同じ結論]
+  上記(1)を実施した。`DwtCuda.cu`223行目・397行目(現在の行番号ではおよそ
+  234行目・411行目)の非ctx版・ctx版`THREADS`定数を同時に256(基準)→128→64→32
+  の順に変更し、`chart_color`実画像で`SVT_CUDA_PROFILE=1`の`NLT+DWT
+  (own graph)`診断計測(各3回試行)を実機(RTX 5070 Ti)で実施した:
+
+    THREADS=256(基準): 6.169 / 6.667 / 6.303 ms(平均約6.38ms)
+    THREADS=128       : 6.557 / 6.747 / 5.994 ms(平均約6.43ms)
+    THREADS=64        : 6.208 / 6.049 / 6.151 ms(平均約6.14ms)
+    THREADS=32        : 6.892 / 7.418 / 6.331 ms(平均約6.88ms)
+
+  → **4値とも約6.0〜7.4msの範囲に収まり、誤差範囲を超える有意な改善は
+  実機でも見られなかった。**開発機での「効果ゼロ」という結論が、SM数が
+  多く(70 SM、開発機22 SMの約3.2倍)grid未充足問題が理論上より深刻なはずの
+  実機でも変わらなかったことになる。これは、`k_vertical_lift`が
+  shared memory無し・ブロック単位の処理無しの単純カーネルであるため、
+  ブロックサイズ変更そのものが演算経路・メモリアクセスパターンに実質的な
+  影響を与えていない可能性を示唆する(未検証の仮説、開発機での考察(a)(b)(c)
+  のうちSM占有率仮説(b)は本測定により否定的な材料が増えた)。
+  検証後、コードはTHREADS=256(元の値)へ復元済み、`*Cuda*`テスト31/31 pass・
+  `git diff`差分なしを確認した(bit-exact・無回帰、コード変更は最終的に
+  ゼロ)。**これによりTODO4(実機RTX 5070 Tiでの実測検証)は完了した。**
+
+  次の一歩の候補(未着手): (1) Step B2(`k_image_shift`インライン融合、
+  DWT側、確度中・見積り0.7〜2.5ms改善)、(2) graph2(Pack)側の追加最適化
+  ── 実機ではPackの比重が開発機より増している(58%)ため、優先度の見直しが
+  妥当と考えられる(未検証だが上記データに基づく判断)。いずれも本セッション
+  では未着手、ユーザー判断待ち。
+
+  [2026-08-28 Step B2着手(実装前計画確定)] ユーザー判断により(1)Step B2
+  から着手する。詳細設計はPlan modeで作成し、計画ファイル
+  `C:\Users\gtats\.claude\plans\splendid-stargazing-pebble.md`に保存済み
+  (ユーザー承認済み、実装未着手)。要旨: `k_image_shift`(全ピラミッド
+  バッファに対して1回だけ実行するint32→uint16 shift/符号変換カーネル)を、
+  各バンドが確定書き込みされる箇所(`k_horizontal_lift`のHF/LF書き込み・
+  最終LLバンド)へインライン化し、int32スクラッチ`d_pyramid`を経由する
+  往復トラフィック(4byte書き込み+4byte再読み込み+2byte書き込み=10byte/要素)
+  を2byte/要素の直接書き込みへ削減する。`d_pyramid`(`d_pyramid32`)は
+  DWT内部専用のスクラッチで外部(GC/RC/Pack)は最終出力`d_pyramid16`のみを
+  参照していることを確認済みのため、公開シグネチャ(`DwtCuda.cuh`)・
+  `FrameContextCuda.cu/.cuh`側は変更不要。実装前の必須事前準備として、
+  既存CUDA DWTテストが偶数幅・偶数高さしか使っていないこと(今回touchする
+  tail分岐が一度も検証されていないこと)を確認済みであり、`TestDwtCuda.cc`
+  へ奇数幅・奇数高さのテストケース4件を追加し、変更前ベースラインでPASSする
+  ことを確認するステップを実装の最初に置く。詳細は計画ファイル参照。
+
+  [2026-08-28 Step B2実装完了 ── bit-exact・無回帰、実機で小幅ながら
+  正の高速化を達成]
+  計画ファイル(`C:\Users\gtats\.claude\plans\splendid-stargazing-pebble.md`)
+  どおりに実装した。まず事前準備として`TestDwtCuda.cc`に奇数幅・奇数高さの
+  テストケース4件(`decom_h1_v1_odd_both`ほか)を追加し、変更前のコードで
+  全てPASSすることを確認(ベースライン確立)。実装は(1)`k_image_shift`の
+  shift/符号変換ロジックを`dwt_shift_to_u16`という共有`__device__`ヘルパーへ
+  切り出し(動作不変、ここでも無回帰を個別に確認)、(2)`k_horizontal_lift`へ
+  `lf_finalize`/`hf_finalize`フラグと対応するuint16出力先パラメータを追加し、
+  確定バンド(HL/LH/HH/HF)はshift変換した値を直接`d_out`へ書き込むよう変更
+  (幅2の特殊ケース・Phase1/2/3すべてに分岐を追加、finalizeされない側には
+  `nullptr`を渡すことで誤配線を即クラッシュで検出できるようにした)、
+  (3)呼び出し側6箇所(`svt_cuda_dwt_component`/`_ctx`のv-loop2回・h-onlyの
+  計3箇所×2関数)を新パラメータに対応させ、(4)最終LLバンドの
+  `cudaMemcpy2D`+全体`k_image_shift`呼び出しを、`k_image_shift`を
+  `active_w`×`active_h`に限定した1回の呼び出しに置き換えた。`d_pyramid`
+  (`d_pyramid32`)はDWT内部で実質未使用のdeadバッファとなったが、公開
+  シグネチャ・`FrameContextCuda.cu/.cuh`は計画どおり無改造(事前調査で
+  外部は`d_pyramid16`のみ参照することを確認済みだったため)。
+
+  検証結果: `*Cuda*`テスト35/35 pass(奇数ケース4件含む、bit-exact)、
+  全回帰12072件中12070件pass(既存スキップ2件のみ、失敗ゼロ)。
+  `SvtJpegxsSampleEncoderCuda`による`testdata/`3ファイル
+  (chart_color/eval_fantom1/yuv422p8)いずれもbit-exact match: YES。
+
+  速度計測(実機RTX 5070 Ti、chart_color実画像、`SVT_CUDA_PROFILE=1`、
+  3回試行平均):
+    NLT+DWT単体(own graph診断計測): 約6.38ms(Step B1時点) → 約5.93ms
+      (約7%改善)
+    graph1全体(warm): 約7.97ms(TODO4時点) → 約7.22ms(約9%改善、
+      約0.75ms短縮)
+    graph2(量子化+Pack): 約12.2〜12.9ms(変更対象外のため実質不変、想定通り)
+    全体(warm、CLI report): 約21.0ms → 約20.0ms
+
+  → **bit-exact・無回帰を維持したまま、事前見積り(0.7〜2.5ms)の下限程度
+  ながら正の高速化を達成した。** 見積りが上限に届かなかった理由は未検証
+  だが、削減した往復トラフィック(d_pyramid経由の10byte/要素→2byte/要素)
+  がNLT+DWT全体のメモリトラフィックのうち相対的に小さい割合だった可能性が
+  考えられる(未検証の仮説)。次の一歩の候補は引き続き(1)Step B3
+  (NLTの`k_vertical_lift`への融合、任意・リスク高)、(2)graph2(Pack)側の
+  追加最適化(実機で比重58%、今回は対象外のまま)が残る。
+
+  [2026-08-28 Step B3着手(実装前計画確定)] ユーザー判断により(1)Step B3
+  から着手する。詳細設計はPlan modeで作成し、計画ファイル
+  `C:\Users\gtats\.claude\plans\splendid-stargazing-pebble.md`に保存済み
+  (ユーザー承認済み、実装未着手)。要旨: `k_nlt_scale_8bit`/`_16bit`が
+  生画素をint32の`d_cur`へ書き込み、直後にdecom_vループの`v==0`の
+  `k_vertical_lift`がその`d_cur`をほぼ全体読み直すという往復
+  (comp_width×comp_height×4byteの書き+読み)を、NLTのshift/offset変換を
+  `k_vertical_lift`の読み出し時に直接適用する形へ融合し削減する
+  (`decom_v>0`の場合のみ、`decom_v==0`は既存パスを無改造で維持)。
+  `dwt_lift53`を`read(i)`という呼び出し可能オブジェクトを取る
+  `dwt_lift53_r<Reader>`テンプレートへ分離し(既存`dwt_lift53`は薄い
+  ラッパーとして完全に動作不変を維持)、新規Reader構造体
+  (`DwtNlt8Reader`/`DwtNlt16Reader`)と新規カーネル
+  (`k_vertical_lift_nlt_8bit`/`_16bit`)を追加する設計。Plan agentによる
+  裏付け調査で、`d_cur`のレベル0時点の内容は他のどこからも読まれない
+  ことを非ctx版・ctx版両方で確認済みのため安全。`DwtCuda.cuh`・
+  `FrameContextCuda.cu/.cuh`・テストファイル群は変更不要(既存の
+  `decom_v>=1`テストケース7件が新経路を自動的にカバーするため新規
+  テスト追加も不要)と確認済み。詳細は計画ファイル参照。
+
+  [2026-08-28 Step B3実装完了 ── bit-exact・無回帰、実機での高速化効果は
+  ごく小幅(正直な記録)]
+  計画ファイル(`C:\Users\gtats\.claude\plans\splendid-stargazing-pebble.md`)
+  どおりに実装した。まず`dwt_lift53`を`read(i)`を取る
+  `dwt_lift53_r<Reader>`テンプレートへ分離(既存`dwt_lift53`は
+  `DwtRawReader`を渡す薄いラッパーとして動作不変、ここで個別に無回帰を
+  確認)。次に`DwtNlt8Reader`/`DwtNlt16Reader`(NLTのshift/offset変換を
+  読み出し時に適用)と新規カーネル`k_vertical_lift_nlt_8bit`/`_16bit`を
+  追加し、`svt_cuda_dwt_component`/`_ctx`両関数で(1)`decom_v==0`の場合の
+  みk_nlt_scale_*を呼ぶよう既存の無条件呼び出しをガードし、(2)decom_v>0の
+  v-loopの`v==0`イテレーションのみ新カーネル(`d_in_raw`を直接読む)を
+  使うよう分岐した(v>=1は既存`k_vertical_lift`のまま無改造)。計画どおり
+  `DwtCuda.cuh`・`FrameContextCuda.cu/.cuh`・テストファイルは無改造。
+
+  検証結果: `*Cuda*`テスト35/35 pass(bit-exact、無回帰)、全回帰12072件中
+  12070件pass(既存スキップ2件のみ、失敗ゼロ)。`SvtJpegxsSampleEncoderCuda`
+  による`testdata/`3ファイル(8bit・10bit入力を両方含む)いずれもbit-exact
+  match: YES。
+
+  速度計測(実機RTX 5070 Ti、chart_color実画像、`SVT_CUDA_PROFILE=1`、
+  3回試行平均):
+    NLT+DWT単体(own graph診断計測): 約5.93ms(Step B2完了時点) → 約5.74ms
+      (約3%改善)
+    graph1全体(warm): 約7.22ms(Step B2完了時点) → 約7.23ms(実質変化なし、
+      測定誤差の範囲)
+    全体(warm、CLI report): 約20.0〜21.0msで大きな変化なし
+
+  → **bit-exact・無回帰は達成したが、事前見積り(24%のトラフィック削減)
+  に対し実測の高速化効果はごく小幅(NLT+DWT単体で約3%)にとどまり、
+  graph1全体では測定誤差に埋もれて有意な改善を確認できなかった。**
+  Step B2(見積りの下限程度は達成)よりもさらに見積りとの乖離が大きい
+  結果であり、正直に記録する。考えられる理由(未検証の仮説): (1)
+  `k_vertical_lift`系カーネル自体がshared memory無し・1スレッド=1列の
+  素朴な実装であり(Step B1で既に「ブロックサイズ変更が効かない」ことが
+  判明している)、読み出し元(d_cur vs d_in_raw)を変えても他のメモリ
+  アクセスパターン上のボトルネック(coalescing、L2キャッシュ効率等)が
+  支配的で、削減した往復バイト数がそのまま速度改善に直結しなかった
+  可能性、(2)NLT自体の絶対的なコスト(comp_width×comp_height×4byteの
+  書き込み1回)が、DWT全体(複数レベルの垂直・水平リフト)のコストに
+  対して相対的に小さかった可能性。
+
+  **Phase Bの累積成果(Step B1〜B3)**: Step B1(ブロックサイズ調整)は
+  開発機・実機とも効果ゼロ、Step B2(バンド単位shift融合)はbit-exact・
+  無回帰かつ小幅ながら明確な正の改善(NLT+DWT約7%、graph1約9%)、
+  Step B3(NLT融合)はbit-exact・無回帰だが改善効果はごく小幅
+  (NLT+DWT約3%、graph1は誤差範囲)。DWTのメモリトラフィック削減という
+  アプローチ単体では、当初の理論値ほどの改善が実機で得られにくいことが
+  2ステップ連続で確認された。残る次の一歩の候補は(1)graph2(Pack)側の
+  追加最適化(実機で全体の58%を占め、今回時点で最大の比重)、(2)DWT
+  カーネル自体のより構造的な再設計(TODO3、horizontal/vertical liftの
+  1レベル内融合、大規模変更のため未着手)。
+
+  [2026-08-28 graph2内訳診断計測 ── 重大な発見: Packではなくquantizeが
+  真のボトルネック]
+  ユーザー指示によりgraph2側の最適化検討に着手。まずgraph1で使った
+  「own-graph診断計測」と同じ手法(`SVT_CUDA_PROFILE=1`限定、一時的な
+  分割CUDA Graphをキャプチャ・計測後即破棄)を`EncodeFrameCuda.cu`の
+  graph2キャプチャ直前に追加し(graph2a: H2D+quantize、graph2a2:
+  quantizeのみ[graph2aが実データをアップロード済みのため再利用]、
+  graph2b: packのみ)、chart_color実画像・3回試行で内訳を実測した:
+
+    H2D+quantize(own graph): 約11.2ms
+    quantize only(own graph、band launch 30回): 約11.5ms
+      (H2D単体はquantizeとの差がほぼ無く、無視できる水準と判明)
+    pack only(own graph): 約0.25ms
+
+  → **`k_pack_precinct_frame`(Phase6で注力してきたPack側)は既に約0.25ms
+  まで高速化されており、graph2の実際のボトルネックは`k_quantize_band_frame`
+  (量子化、30 band launch/frame)で、graph2(約12〜13ms)の90%以上を占める
+  ことが判明した。** Phase6のPack最適化(atomicOr scatter化、significance/
+  gcli/dataの3段階)は、結果的に既にボトルネックでない部分への投資
+  だったことになる(ただしbit-exact・無回帰は維持されており、投資自体が
+  無駄だったわけではない。次にPack側をさらに改善する必要が生じた際の
+  技術基盤として引き続き有効)。
+  `*Cuda*`テスト35/35 pass確認済み(診断計測追加のみのため無回帰は
+  当然だが再確認)。
+
+  [2026-08-28 k_quantize_band_frameの2次元並列化着手(実装前計画確定)]
+  `k_quantize_band_frame`(`EncodeFrameCuda.cu`)を確認した結果、DWTの
+  Phase 4c以前と同じ「1スレッド=1行、幅方向は逐次forループ」という素朴な
+  設計だった。ただし量子化は各係数が完全に独立(DWTのliftingのような
+  隣接依存が無い)ため、DWTのタイル化のような複雑な変更は不要で、単純に
+  「1スレッド=1要素」の2次元grid(既存の`k_nlt_scale_8bit`/`_16bit`・
+  `k_image_shift`[`DwtCuda.cu`]と同じ`dim3 block2d(32,8)`パターン)へ
+  変更するだけで幅方向も並列化できる見込み。詳細設計はPlan modeで作成し、
+  計画ファイル`C:\Users\gtats\.claude\plans\splendid-stargazing-pebble.md`
+  に保存済み(ユーザー承認済み、実装未着手)。数式・分岐は一切変更せず
+  インデックス計算のみ書き換えるため、bit-exactは構造的に保証される設計。
+  対象は`EncodeFrameCuda.cu`のみ(呼び出し側3箇所: 本番graph2キャプチャ+
+  上記診断計測2箇所、いずれも同一パターンの複製)。直接呼ぶユニットテストは
+  存在しない(`TestRcQuantCuda.cc`は別系統のPhase2 API用)ため新規テスト
+  追加は不要、既存の`TestEncodeFrameCuda.cc`等のend-to-end bit-exact
+  比較で検証する。
+
+  [2026-08-28 k_quantize_band_frame実装完了 ── bit-exact・無回帰、
+  実機で劇的な高速化を達成、16ms理想目標を初めて達成]
+  計画ファイルどおりに実装した。`k_quantize_band_frame`
+  (`EncodeFrameCuda.cu`)を「1スレッド=1行、幅方向は逐次forループ」から
+  「1スレッド=1要素の2次元grid(`dim3 block2d(32,8)`)」へ書き換え
+  (数式・分岐は一切変更せず、インデックス計算のみ)、呼び出し側3箇所
+  (本番graph2+診断計測2箇所)のgrid/block構成を対応させた。
+
+  検証結果: `*Cuda*`テスト35/35 pass(bit-exact、無回帰)、全回帰12072件中
+  12070件pass(既存スキップ2件のみ、失敗ゼロ)。`SvtJpegxsSampleEncoderCuda`
+  による`testdata/`3ファイルいずれもbit-exact match: YES。
+
+  速度計測(実機RTX 5070 Ti、chart_color実画像、`SVT_CUDA_PROFILE=1`、
+  3回試行平均):
+    quantize単体(own graph診断計測): 約11.5ms → 約0.78ms(約14.7倍高速化)
+    graph2全体(warm): 約12.2〜12.9ms → 約1.55ms(約8倍高速化)
+    graph1全体(warm): 約7.1ms(変更対象外のため実質不変、想定通り)
+    host RC二分探索(CPU): 約1.16ms(変更対象外、実質不変)
+    **全体(warm、CLI report): 約20〜21ms → 約9〜10ms(約2.1倍高速化)**
+    speedup(CPU/CUDA、SampleEncoderCuda表示): chart_color 2.7x→5.8x、
+      eval_fantom1 2.9x→6.9x、yuv422p8(1080p) 2.2x→4.7x
+
+  → **16ms理想目標を実機で初めて達成した(約9〜10ms、目標の約6割)。
+  33ms現実目標はこれまで以上の余裕で達成継続。** Phase B(DWT側、Step
+  B1〜B3)では小幅な改善にとどまっていたのに対し、今回のgraph2側の
+  発見・修正(「量子化が真のボトルネックだった」という誤った前提の
+  訂正)は、このCUDA移植プロジェクト全体を通じて最大の単発改善効果
+  だった。教訓: Phase6でPack側(atomicOr scatter化)に注力する判断は、
+  当時の粒度の粗い計測(「graph2(quantize+pack)」を1つの数値として
+  扱っていた)に基づく合理的な判断だったが、実際にはPackはその後の
+  最適化で既に十分高速化されており、同じ粒度の粗い計測を最後まで
+  使い続けていたために量子化側の劣化(素朴な1スレッド=1行実装のまま)が
+  「Pack最適化で相殺されて見えなくなっていた」わけではなく、単に
+  一度も内訳を計測していなかったために気づかれていなかった。**大きな
+  複合カーネル区間を1つの数値としてまとめて計測し続けることのリスク
+  (ボトルネックの誤認)を示す実例として記録する。**
+
+  残る次の一歩の候補: (1) graph1(DWT、実機で約7.1ms、現時点で最大の
+  比重)側の更なる最適化(TODO3、horizontal/vertical liftの1レベル内
+  融合、大規模変更のため未着手)、(2) host RC二分探索(CPU側、約1.16ms)
+  のさらなる高速化、(3) 今回追加した`SVT_CUDA_PROFILE=1`限定の
+  graph2a/graph2a2/graph2b診断計測コードの取り扱い(デバッグ用として
+  残すか削除するか、ユーザー判断待ち)。
+
+  [2026-08-28 診断計測コードの扱い確定] (3)について、`efc_prof`
+  (`SVT_CUDA_PROFILE`環境変数の有無、`efc_profile_enabled()`で初回のみ
+  `getenv`判定し`static const bool`にキャッシュ)による`&&`短絡評価で
+  graph2a/graph2a2/graph2b診断ブロック全体がガードされており、環境変数
+  未設定(本番Releaseのデフォルト)では一切実行されない(graph1側の
+  既存診断コードと同じ確立済みパターン)ことをコード確認したうえで、
+  本番速度に影響しないためこのまま維持する方針に確定した。追加の
+  コード変更は無し。
+
+  **[2026-08-28 本セッションはここで終了。次回以降に持ち越す未着手TODOを
+  明示的に記録する]**
+
+  **TODO A(graph1/DWT側の更なる最適化)**: graph1(実機warm約7.1ms、現時点
+  で全体の最大の比重、約7.1ms/9〜10ms≈70%超)のうち、DWT
+  (`k_horizontal_lift`/`k_vertical_lift`)自体のさらなる再設計。本節
+  「TODO 3(将来のPhase C候補、設計未着手)」で記録した
+  `k_horizontal_lift`と`k_vertical_lift`の1レベル内融合(行ストリップ方式等)
+  が本命候補だが、スレッド/ブロックマッピングが根本的に非互換
+  (行単位ブロック+shared memory vs 列単位スレッド+shared memory無し)で
+  新規カーネル設計が必要な大きな変更。着手する場合は改めて専用のPlan mode
+  セッションを設ける。graph2側のquantize発見(TODO化していた粒度の粗い
+  計測の教訓)を踏まえ、着手前にgraph1内部(NLT+DWT/GC+RC-LUT)の内訳を
+  さらに細かく計測しておくことを推奨(セクション8「2026-08-28
+  前回計測の訂正、および分割グラフによる正確な再計測」で判明した
+  NLT+DWT単体約6ms程度の内訳——horizontal/vertical lift個別、decomposition
+  level毎——は未計測)。
+
+  **TODO B(host RC二分探索のCPU側最適化)**: 現在CPU側で実行している
+  RC二分探索(540 precincts、約1.16ms)は全体(約9〜10ms)の1割強を占める。
+  GPU化するか、CPU側の実装自体を最適化するかは未検討・未着手。
+
+  **TODO C(実測値の再現性・複数testdataファイルでの内訳確認)**: 本セッションの
+  内訳計測はchart_color実画像のみで行った。eval_fantom1・yuv422p8
+  (1920x1080)についてもgraph1/graph2の内訳・quantize改善効果を計測し、
+  解像度・入力特性による傾向差が無いか確認する余地が残っている。
+
+  **TODO D(診断計測コードの整理)**: `SVT_CUDA_PROFILE=1`限定のgraph1/graph2
+  診断コード(sub-measure用の一時CUDA Graph)が`EncodeFrameCuda.cu`に
+  複数蓄積している。本番速度への影響は無いことを確認済みだが、将来的に
+  コードの見通しが悪くなった場合は共通ヘルパー関数への整理を検討する余地
+  がある(優先度低、機能的な問題は無い)。
+
+--------------------------------------------------
+13. ビットストリームの独立検証(ISO公式リファレンスデコーダ)
+--------------------------------------------------
+  [2026-08-28 ユーザー指摘: これまでの検証はCPU版とのbit-exact比較のみで、
+  実際のJPEG-XS規格適合性(他社デコーダでの復号可能性)は一度も検証していない
+  ことが判明] 独立した検証手段として、ISO/IEC 21122-5公式リファレンス
+  ソフトウェア(著作権者: intoPIX SA、Fraunhofer IIS、Canon Inc、
+  jpeg.org公式サイトからダウンロード可能なzip、"JPEG XS test model (XSM)
+  version 3.0.2-ED3")を導入した。当初候補に上がった`github.com/TangKii/jxs`
+  は個人アカウントによる非公式ミラーだったため不採用とし
+  (ユーザー自身の指摘で発覚)、ISO公式サイトの直接配布zip
+  (`https://standards.iso.org/iso-iec/21122/-5/ed-3/en/ISO_IEC_21122-5_ED-3.zip`)
+  を使用。ライセンス("Copyright License for Evaluation and Testing")は
+  自己実装の規格適合性判定目的での利用を明示的に許諾しており、今回の用途に
+  合致する。評価目的限定ライセンスのため、ユーザー判断により**このリポジトリの
+  git管理下には一切含めず**、このマシンのスクラッチ領域でのみビルド・実行する
+  (`third_party/`への取り込みはしない)。ビルドはCUDA不要の純粋なC/C++
+  CMakeプロジェクトで、既存のVS2022 BuildTools環境で問題なく成功
+  (`jxs_encoder.exe`/`jxs_decoder.exe`)。セルフラウンドトリップで
+  ツール自体の健全性も確認済み。
+
+  [2026-08-28 検証結果: プロファイル宣言バグを発見(CUDA範囲外、ベース
+  エンコーダの実バグ)] `SvtJpegxsSampleEncoderCuda`(bpp=4、ユーザー指示に
+  より以後の速度測定は全てbpp=4に統一)で生成したCUDA版ビットストリームを
+  ISO参照デコーダへ入力したところ、「Error: Unsupported number of vertical
+  decompositions for selected profile」で復号を拒否された。CPU版ビット
+  ストリームでも同一エラーで拒否されることを確認(CUDA版とCPU版はbit-exact
+  なので当然)。原因調査により、これはCUDA移植特有の問題ではなく、
+  `Source/Lib/Encoder/Codec/ProfileLevel.c`の`derive_stream_profile_ppih()`
+  (CPU版・CUDA版共通のベースコード)が、実際の垂直分解レベル数`decom_v`を
+  一切考慮せずプロファイル(Ppih)を決定していたバグであることが判明した。
+  ISO参照ソフトのプロファイル定義表(`xs_config.c`の`XS_PROFILES[]`)により
+  Main系プロファイルの最大垂直分解レベル(NLy)は1、High系は2であることを
+  確認。一方この結成物の`svt_jpeg_xs_encoder_load_default_parameters()`は
+  デフォルトで`ndecomp_v=2`を設定しており(`EncHandle.c`532-533行目)、この
+  プロジェクトの全ての実測(testdata検証含む)がこのデフォルト値を使っていた
+  ため、生成された全てのビットストリームが規格上非適合(誤ったMain
+  プロファイル宣言)になっていた。SVT自身のデコーダはPpih値を検証・分岐に
+  使わないため問題なく復号できていたが、規格に忠実な独立デコーダは正しく
+  拒否する。
+
+  [2026-08-28 修正着手(実装前計画確定)] ユーザー判断により修正する方針
+  (derive_stream_profile_ppih()がdecom_vに応じてHighプロファイルを宣言する
+  よう修正)を選択。詳細設計はPlan modeで作成し、計画ファイル
+  `C:\Users\gtats\.claude\plans\splendid-stargazing-pebble.md`に保存済み
+  (ユーザー承認済み、実装未着手)。要旨: 420/444/4444は`decom_v>1`で
+  Highプロファイル(codeword`JXS_PPIH_HIGH_*`は全て定義済みを確認)を宣言
+  するよう修正。**422/400についてはISO/IEC 21122-2規格自体にHighプロファイル
+  のcodewordが定義されておらず(ISO参照ソフトの`XS_PROFILES[]`にも存在しない)、
+  修正不可能な既知の規格上の制限として文書化する**(既存のbit_depth>12警告と
+  同じパターンで警告を出す設計)。呼び出し元は`EncHandle.c`225-227行目の
+  1箇所のみで、この時点で`config_struct->ndecomp_v`が確定済みであることを
+  コード確認済み。`hdr_Ppih`はビットストリームのメタデータ表示のみに使われ
+  (SVT自身のデコーダは検証・分岐に使わない)、影響範囲は
+  `tests/UnitTests/TestProfileLevel.cc`(既存15箇所への引数追加、
+  integration系3件の期待値更新[decom_v=2デフォルトによりMain→Highへ変わる
+  ことが正しい]、新規テストケース追加)に限定されることを確認済み。
+  詳細は計画ファイル参照。
+
+  [2026-08-28 decom_v対応の修正を実装完了(bit-exact・無回帰) ── ただし
+  ISO参照デコーダでの実地検証により、この修正だけではまだ不十分と判明]
+  計画どおり`ProfileLevel.h`/`.c`(シグネチャに`decom_v`追加、420/444/4444は
+  decom_v>1でHighプロファイルを宣言、422/400は規格自体にHighが定義されて
+  いないため既存のMainフォールバックを維持しつつ警告を追加)・`EncHandle.c`
+  (呼び出し元、`config_struct->ndecomp_v`を渡す)・`TestProfileLevel.cc`
+  (既存15箇所への引数追加、integration系3件の期待値更新、新規テスト4件
+  追加)を変更した。CPU版ビルドで対象テスト25/25 pass、全回帰12039/12041
+  pass。CUDA版も再ビルドし`*Cuda*`35/35 pass(CUDA経路はCPU初期化済み
+  エンコーダの内部状態からヘッダーを取得するため自動的に修正を反映)、
+  全回帰12074/12076 pass(無回帰、新規テスト4件を含めて増加)。
+
+  この修正適用後、ISO参照デコーダで再検証したところ、「Unsupported number
+  of vertical decompositions」エラーは解消したが、**新たな別のエラー
+  「Error: Slice height must be 16 lines high」に到達した**。ISO参照
+  ソフトのソース(`xs_config.c`3316行目)を確認すると、この制約は
+  `cfg->profile != XS_PROFILE_UNRESTRICTED`という条件で判定されており、
+  **Highプロファイルに限らずMainを含む全ての名前付きプロファイルに共通**
+  する。このプロジェクトの`SampleEncoderCuda`(`main.c`206行目)は
+  `enc.slice_height = image.height`(Phase4aのスコープ決定、単一slice)を
+  明示的に設定しており、名前付きプロファイルを宣言する限り、decom_vの
+  修正だけでは規格適合にならないことが判明した。
+
+  [2026-08-28 Unrestrictedプロファイル(Ppih=0x0000)の実地検証 ── 3ファイル
+  全てで復号成功を確認]
+  `derive_stream_profile_ppih()`を一時的に`return 0`へ書き換える実験パッチ
+  (検証後revert済み、現在のコードは`decom_v`対応版のまま)でtestdata 3ファイル
+  (bpp=4)を再エンコードし、ISO参照デコーダで復号したところ、**全てexit:0で
+  復号成功**した(chart_color・eval_fantom1はPPM出力、yuv422p8のみ出力
+  拡張子を`.yuv`に変更する必要があった——422のPPM出力エラーはデコーダCLI
+  ツールの出力形式制約であり規格上の問題ではないことも確認済み)。ISO参照
+  ソフトのソース確認により、NLy制約(3227行目)・slice_height制約
+  (3316行目)ともに`profile != XS_PROFILE_UNRESTRICTED`で判定除外されて
+  いるため、Unrestrictedを宣言すればどちらの制約も回避できることが実地で
+  裏付けられた。
+
+  一方、`SampleEncoderCuda`の`slice_height`設定を調査した結果、
+  **ライブラリ自体のデフォルト(`svt_jpeg_xs_encoder_load_default_
+  parameters()`, `EncHandle.c`536行目)は`slice_height=16`であり、
+  現在の`slice_height=source_height`(単一slice)という設定は
+  `SampleEncoderCuda`の`main.c`206行目が明示的に上書きしている選択**
+  であることが判明した。つまり選択肢は大きく2つ:
+    (A) `derive_stream_profile_ppih()`に`slice_height`(または「名前付き
+        プロファイルの構造的要件を満たすか」を表すフラグ)も渡し、
+        slice_height≠16の場合は常にUnrestrictedを宣言するよう拡張する
+        (現在の実装[decom_v対応]を土台として拡張、既存の単一slice設計は
+        変更しない)。
+    (B) `SampleEncoderCuda`を含むCUDA検証パスの`slice_height`を16に戻す
+        (ライブラリのデフォルトへ戻すだけ)ことで、名前付きプロファイル
+        (Main/High)がそのまま規格適合になり、Unrestrictedへの変更が
+        不要になる可能性がある。ただしこれはPhase4aが意図的に選んだ
+        「単一slice」という前提(`RC_CBR_PER_PRECINCT`採用の経緯、
+        `EncodeFrameCuda.cu`が単一sliceを暗黙に前提にしている箇所が
+        無いか)に触れるため、CUDA側のコードを精査してから判断する必要
+        がある(未調査)。
+
+  **[2026-08-28 セッション終了、次回への持ち越しTODO]**
+
+  **TODO E(プロファイル宣言の完全な修正、方針A or B の選択と実装)**:
+  上記(A)(B)いずれかで、実際にこのプロジェクトが生成するビットストリームが
+  ISO参照デコーダで完全に復号成功する状態まで持っていく。現在のコード状態
+  (decom_v対応版、bit-exact・無回帰は維持済みだがISO適合はまだ未達)は
+  git未コミットのまま作業ツリーに残っている(`PortingStrategy.txt`・
+  `DwtCuda.cu`・`EncodeFrameCuda.cu`・`EncHandle.c`・`ProfileLevel.c`/`.h`・
+  `TestDwtCuda.cc`・`TestProfileLevel.cc`が変更済み、コミット未実施)。
+  方針(B)を選ぶ場合は`EncodeFrameCuda.cu`が単一slice(`slice_idx=0`固定等)
+  を前提にしていないかの精査が先に必要。方針(A)を選ぶ場合は
+  `derive_stream_profile_ppih()`・呼び出し元(`EncHandle.c`)・
+  `TestProfileLevel.cc`の追加改修が必要(今日の変更を土台にできる)。
+  いずれの方針でも、最終的にはtestdata 3ファイル全てがISO参照デコーダで
+  `exit:0`かつ正常なピクセル復号(元画像とのPSNR比較等)まで確認することを
+  完了条件とする。
+
+  **TODO F(既存の`NeverReturnsZero`テストの前提の見直し)**: 現在の
+  `tests/UnitTests/TestProfileLevel.cc`には「Ppih=0x0000は決して有効な
+  プロファイルではない」という前提のテスト・コメントがあるが、今回の調査で
+  `XS_PROFILE_UNRESTRICTED=0x0000`はISO/IEC 21122-2上正当に定義された
+  プロファイルであることが判明した。方針(A)を選ぶ場合、このテスト前提
+  (および`profile_ppih_override`が`!=0`判定のため文字通りのUnrestricted
+  [0x0000]を明示指定する経路が公開APIに無いという設計上のギャップ)も
+  合わせて見直す必要がある。
+
+  **TODO G(引き続き未着手のTODO A〜D)**: 本セッション冒頭で記録した
+  TODO A(graph1/DWT側の更なる最適化)・TODO B(host RC二分探索のCPU側
+  最適化)・TODO C(他testdataファイルでの内訳計測)・TODO D(診断計測
+  コードの整理)は今回未着手のまま持ち越し。

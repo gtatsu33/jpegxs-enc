@@ -8,41 +8,62 @@
 #include <stdio.h>
 #include "SvtLog.h"
 
-uint16_t derive_stream_profile_ppih(ColourFormat_t colour_format, uint8_t bit_depth, uint32_t verbose) {
+uint16_t derive_stream_profile_ppih(ColourFormat_t colour_format, uint8_t bit_depth, uint32_t decom_v, uint32_t verbose) {
     uint16_t ppih;
+    /* NLy bound per ISO/IEC 21122-2 Annex A: "Main" family permits at most 1 vertical decomposition
+     * level, "High" family at most 2 -- see the ISO/IEC 21122-5 reference software's XS_PROFILES[]
+     * table (xs_config.c) for the authoritative per-profile NLy values this mirrors. */
+    int high_decom = decom_v > 1;
+    /* Set for 4:2:2/4:0:0 below: no "High" profile exists for that sampling in ISO/IEC 21122-2 at all
+     * (not merely undeclared by this encoder -- the profile table itself has no such entry), so
+     * decom_v>1 with that sampling cannot be correctly declared by any Ppih codeword. */
+    int no_high_profile_for_sampling = 0;
 
     switch (colour_format) {
     case COLOUR_FORMAT_PLANAR_YUV420:
-        ppih = JXS_PPIH_MAIN_420_12;
+        ppih = high_decom ? JXS_PPIH_HIGH_420_12 : JXS_PPIH_MAIN_420_12;
         break;
     case COLOUR_FORMAT_PLANAR_4_COMPONENTS:
     case COLOUR_FORMAT_PLANAR_YUV422_ALPHA:
-        /* Both 4-component sampling shapes (4:4:4:4 and 4:2:2:4) are covered by the same Main
+        /* Both 4-component sampling shapes (4:4:4:4 and 4:2:2:4) are covered by the same Main/High
          * 4444.12 profile - see ISO/IEC 21122-2:2022 Annex A Table A.1 chroma sampling formats
          * list for that profile. */
-        ppih = JXS_PPIH_MAIN_4444_12;
+        ppih = high_decom ? JXS_PPIH_HIGH_4444_12 : JXS_PPIH_MAIN_4444_12;
         break;
     case COLOUR_FORMAT_PLANAR_YUV444_OR_RGB:
     case COLOUR_FORMAT_PACKED_YUV444_OR_RGB:
-        ppih = JXS_PPIH_MAIN_444_12;
+        ppih = high_decom ? JXS_PPIH_HIGH_444_12 : JXS_PPIH_MAIN_444_12;
         break;
     case COLOUR_FORMAT_PLANAR_YUV422:
     case COLOUR_FORMAT_PLANAR_YUV400:
     default:
         /* Main 422.10 also covers 4:0:0 (grayscale); Main 444.12 is the closest defined profile once
-         * bit depth exceeds what Main 422.10 permits (8 or 10 bit). */
+         * bit depth exceeds what Main 422.10 permits (8 or 10 bit). No "High" profile is defined for
+         * either sampling, so decom_v is not consulted for the codeword choice here -- only for the
+         * warning below. */
         ppih = (bit_depth <= 10) ? JXS_PPIH_MAIN_422_10 : JXS_PPIH_MAIN_444_12;
+        no_high_profile_for_sampling = high_decom;
         break;
     }
 
-    /* Every "Main" profile above tops out at 12-bit; the encoder additionally allows 13/14-bit input
-     * (see encoder_init_configuration()), a combination with no defined ISO/IEC 21122-2 lossy profile.
-     * Keep declaring the closest Main profile (still a validly-defined codeword, unlike Ppih=0) but
-     * make the limitation visible. */
+    if (no_high_profile_for_sampling && verbose >= VERBOSE_WARNINGS) {
+        SVT_WARN(
+            "Warning: decom_v %u exceeds the maximum (1) permitted by the declared Main profile, but "
+            "ISO/IEC 21122-2 defines no High profile for 4:2:2/4:0:0 sampling; declaring the closest Main "
+            "profile (Ppih=0x%04X) despite the mismatch. Use profile_override_enable if a different "
+            "declaration is required.\n",
+            decom_v,
+            ppih);
+    }
+
+    /* Every "Main"/"High" profile above tops out at 12-bit; the encoder additionally allows 13/14-bit
+     * input (see encoder_init_configuration()), a combination with no defined ISO/IEC 21122-2 lossy
+     * profile. Keep declaring the closest profile (still a validly-defined codeword, unlike Ppih=0)
+     * but make the limitation visible. */
     if (bit_depth > 12 && verbose >= VERBOSE_WARNINGS) {
         SVT_WARN(
             "Warning: bit depth %u exceeds the maximum (12) defined by any ISO/IEC 21122-2 lossy profile; "
-            "declaring the closest Main profile (Ppih=0x%04X). Use profile_override_enable if a different "
+            "declaring the closest profile (Ppih=0x%04X). Use profile_override_enable if a different "
             "declaration is required.\n",
             bit_depth,
             ppih);

@@ -62,11 +62,17 @@ typedef enum StreamSublevelPlev {
 } StreamSublevelPlev;
 
 /* Derive the Ppih (profile) codeword from the encoder configuration.
- * Always returns a validly-defined "Main" family Ppih codeword for the supported bit-depth range
- * (8-12 bit); for the encoder's extended 13-14 bit range (outside every defined ISO/IEC 21122-2 lossy
- * profile) the closest Main profile for the given colour format is returned and a warning is printed
- * when verbose >= VERBOSE_WARNINGS. */
-uint16_t derive_stream_profile_ppih(ColourFormat_t colour_format, uint8_t bit_depth, uint32_t verbose);
+ * Always returns a validly-defined "Main" or "High" family Ppih codeword for the supported bit-depth
+ * range (8-12 bit); for the encoder's extended 13-14 bit range (outside every defined ISO/IEC 21122-2
+ * lossy profile) the closest Main/High profile for the given colour format is returned and a warning
+ * is printed when verbose >= VERBOSE_WARNINGS.
+ * decom_v selects between the "Main" (NLy<=1) and "High" (NLy<=2) family for 4:2:0, 4:4:4/RGB and
+ * 4:4:4:4 sampling, per ISO/IEC 21122-2 Annex A's per-profile NLy bound. 4:2:2/4:0:0 sampling has no
+ * defined "High" profile at all (a gap in the ISO/IEC 21122-2 profile table itself, not something this
+ * encoder can work around): decom_v>1 with 4:2:2/4:0:0 still declares the closest Main profile and
+ * prints a warning (when verbose >= VERBOSE_WARNINGS) that the declaration does not fully cover the
+ * actual decomposition depth, mirroring the existing bit-depth>12 warning below. */
+uint16_t derive_stream_profile_ppih(ColourFormat_t colour_format, uint8_t bit_depth, uint32_t decom_v, uint32_t verbose);
 
 /* Derive the Plev (level + sublevel) codeword from picture resolution and target bits-per-pixel.
  * Always returns a validly-defined Plev codeword: falls back to the "Unrestricted" level and/or

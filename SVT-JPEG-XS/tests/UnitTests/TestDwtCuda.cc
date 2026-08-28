@@ -210,3 +210,26 @@ TEST(DwtCuda, decom_h3_v1_8bit) {
 TEST(DwtCuda, decom_h5_v2_10bit_4k) {
     run_dwt_cuda_vs_cpu(3840, 2160, 5, 2, 10);
 }
+
+/* [2026-08-28 Phase B, Step B2 prerequisite] The cases above are all
+ * even-width/even-height. dwt_lift53's odd-length tail branch (and
+ * k_horizontal_lift's matching Phase 3 tail) had never been exercised by any
+ * CUDA DWT test before this. Added ahead of Step B2 (band-write fusion of
+ * k_image_shift into k_horizontal_lift) precisely because that change
+ * touches this tail branch -- see PortingStrategy.txt Phase B / Step B2
+ * notes for the full rationale. */
+TEST(DwtCuda, decom_h1_v1_odd_both) {
+    run_dwt_cuda_vs_cpu(201, 97, 1, 1, 10);
+}
+
+TEST(DwtCuda, decom_h3_v1_odd_width_even_height) {
+    run_dwt_cuda_vs_cpu(199, 96, 3, 1, 8);
+}
+
+TEST(DwtCuda, decom_h2_v2_odd_height_even_width) {
+    run_dwt_cuda_vs_cpu(96, 199, 2, 2, 10);
+}
+
+TEST(DwtCuda, decom_h3_v2_odd_both) {
+    run_dwt_cuda_vs_cpu(203, 101, 3, 2, 10);
+}

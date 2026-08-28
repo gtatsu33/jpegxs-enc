@@ -1,61 +1,61 @@
 # ninja log v6
 79	142	8093648305952474	Source/Lib/Common/ASM_SSE2/CMakeFiles/COMMON_ASM_SSE2.dir/PictureOperators_SSE2.asm.obj	c7ce8f6537da64c4
-420	695	8093648309364648	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/RateControl.c.obj	fdebd91eac5dac27
-95	281	8093648306112568	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/BitstreamWriter.c.obj	8d463e5128a5d402
-65	459	8093666094141582	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/SvtUtility.c.obj	45d2778789dedd50
-427	633	8093648309427870	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/WeightTable.c.obj	e0cdfda60f183a68
-74	439	8093666094235606	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/Threads/SvtThreads.c.obj	657db78ede5606e
 976	1118	8093648314927022	third_party/cpuinfo/CMakeFiles/cpuinfo.dir/src/x86/vendor.c.obj	bd1d0ef7bb593e27
 136	288	8093648306523510	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/NltEnc.c.obj	a63055161ea156f6
+95	281	8093648306112568	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/BitstreamWriter.c.obj	8d463e5128a5d402
+420	695	8093648309364648	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/RateControl.c.obj	fdebd91eac5dac27
+65	459	8093666094141582	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/SvtUtility.c.obj	45d2778789dedd50
+74	439	8093666094235606	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/Threads/SvtThreads.c.obj	657db78ede5606e
+427	633	8093648309427870	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/WeightTable.c.obj	e0cdfda60f183a68
 84	197	8093648306005260	Source/Lib/Common/ASM_AVX2/CMakeFiles/COMMON_ASM_AVX2.dir/empty.c.obj	1923921431ee0fa4
-74	179	8093648305898398	Source/Lib/Common/ASM_SSE2/CMakeFiles/COMMON_ASM_SSE2.dir/empty.c.obj	a6fe5f0a3a50f7f8
 197	471	8093648307131001	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/PackPrecinct.c.obj	66f4aba518762287
-90	203	8093648306060057	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/BinarySearch.c.obj	92c5ab4c0132be73
+74	179	8093648305898398	Source/Lib/Common/ASM_SSE2/CMakeFiles/COMMON_ASM_SSE2.dir/empty.c.obj	a6fe5f0a3a50f7f8
 47	473	8093666093955865	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/EncDec.c.obj	f6deba0c15c34680
+90	203	8093648306060057	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/BinarySearch.c.obj	92c5ab4c0132be73
 51	428	8093666094005254	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/ImageBuffer.c.obj	590b27d1ea57fc53
 1133	1246	8093648316483843	Source/App/SampleDecoder/CMakeFiles/SvtJpegxsSampleDecoder.dir/main.c.obj	19178266ba100fdd
 83	422	8093666094313293	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/common_dsp_rtcd.c.obj	1fbcf5a243a17e5
-100	307	8093648306158688	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/Dwt.c.obj	13fd1ed9152b8ea3
 831	989	8093648313464087	Source/Lib/Decoder/ASM_AVX2/CMakeFiles/DECODER_ASM_AVX2.dir/NltDec_AVX2.c.obj	77dc04e1cfcd00f
+100	307	8093648306158688	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/Dwt.c.obj	13fd1ed9152b8ea3
 56	488	8093666094054193	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/Pi.c.obj	e60512a45b0a954f
 282	412	8093648307973245	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/PiEnc.c.obj	28c09effbb861919
-289	420	8093648308046899	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/PictureControlSet.c.obj	ea749d6e65798b55
+851	1113	8093648313671377	Source/Lib/Decoder/ASM_AVX512/CMakeFiles/DECODER_ASM_AVX512.dir/NltDec_avx512.c.obj	c7d3bb766aa12c5a
 1275	1432	8093648909600881	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsDecApp.exe	e6ea765baba9a0fd
 192	433	8093648307076751	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/PackOut.c.obj	bfef7f446eba6607
-851	1113	8093648313671377	Source/Lib/Decoder/ASM_AVX512/CMakeFiles/DECODER_ASM_AVX512.dir/NltDec_avx512.c.obj	c7d3bb766aa12c5a
+289	420	8093648308046899	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/PictureControlSet.c.obj	ea749d6e65798b55
 143	427	8093648306594876	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/PackHeaders.c.obj	6601e8668226c855
 307	439	8093648308235563	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/ProfileLevel.c.obj	a2e8d1b1dee3bbe
 301	464	8093648308167928	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/PrecinctEnc.c.obj	594bf3026bc178de
 70	447	8093666094182866	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/Threads/SvtMalloc.c.obj	9feaae6e712a25f2
 464	493	8093648309798189	Source/Lib/Encoder/ASM_SSE2/CMakeFiles/ENCODER_ASM_SSE2.dir/ASM_SSE2.asm.obj	3f56f3255caaeb5a
 439	499	8093648309550691	Source/Lib/Encoder/ASM_SSE2/CMakeFiles/ENCODER_ASM_SSE2.dir/empty.c.obj	c6548a89cd3634
-120	671	8093648306358968	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/FinalStageProcess.c.obj	8733f3542dbe1625
-79	467	8093666094279150	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/Threads/SystemResourceManager.c.obj	6c1a6612129de418
-845	1001	8093648313611082	Source/Lib/Decoder/ASM_AVX512/CMakeFiles/DECODER_ASM_AVX512.dir/Dequant_avx512.c.obj	a05d637f26a0e8c7
-34	1353	8093696688161023	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/PackCuda.cu.obj	cde3146b9c6cc2a
+91	3359	8093992742105170	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/PackCuda.cu.obj	8036472e8b841523
 313	579	8093648308294088	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/Quant.c.obj	3f113f55d9005afd
 970	1107	8093648314859767	third_party/cpuinfo/CMakeFiles/cpuinfo.dir/src/x86/x86_init.c.obj	ef541e75a8cb6213
+845	1001	8093648313611082	Source/Lib/Decoder/ASM_AVX512/CMakeFiles/DECODER_ASM_AVX512.dir/Dequant_avx512.c.obj	a05d637f26a0e8c7
+79	467	8093666094279150	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/Threads/SystemResourceManager.c.obj	6c1a6612129de418
+120	671	8093648306358968	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/FinalStageProcess.c.obj	8733f3542dbe1625
 131	595	8093648306465067	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/InitStageProcess.c.obj	a8342e365ad5dad2
 60	481	8093666094094160	Source/Lib/Common/Codec/CMakeFiles/COMMON_CODEC.dir/SvtLog.c.obj	533789da70e7d578
 413	603	8093648309289195	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/QuantStageProcess.c.obj	da4391b5ea08b2dd
 818	955	8093648313332469	Source/Lib/Decoder/ASM_SSE4_1/CMakeFiles/DECODER_ASM_SSE4_1.dir/Dequant_SSE4.c.obj	8229eb695a3b10b4
-471	610	8093648309869738	Source/Lib/Encoder/ASM_SSE4_1/CMakeFiles/ENCODER_ASM_SSE4_1.dir/Quant_sse4_1.c.obj	461fc2b5225cb33f
 179	663	8093648306951978	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/PackIn.c.obj	d10743558ad72c53
-110	627	8093648306258122	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/DwtStageProcess.c.obj	83656a92e3de642e
+471	610	8093648309869738	Source/Lib/Encoder/ASM_SSE4_1/CMakeFiles/ENCODER_ASM_SSE4_1.dir/Quant_sse4_1.c.obj	461fc2b5225cb33f
 604	811	8093648311195670	Source/Lib/Encoder/ASM_AVX512/CMakeFiles/ENCODER_ASM_AVX512.dir/Pack_avx512.c.obj	23c9a928544cbdff
-105	649	8093648306216709	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/DwtInput.c.obj	fb70cc1018f25d56
+110	627	8093648306258122	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/DwtStageProcess.c.obj	83656a92e3de642e
 433	970	8093648309492828	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/encoder_dsp_rtcd.c.obj	f8a6fa31888cbb55
+105	649	8093648306216709	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/DwtInput.c.obj	fb70cc1018f25d56
 480	655	8093648309960778	Source/Lib/Encoder/ASM_SSE4_1/CMakeFiles/ENCODER_ASM_SSE4_1.dir/group_coding_sse4_1.c.obj	948a0c3bb1e2915c
-125	688	8093648306414914	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/GcStageProcess.c.obj	6140391f68a846ce
 44	245	8093667358101899	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/gtest.lib	b4a94f8f504d6456
 618	786	8093648311339524	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/BitstreamReader.c.obj	734cd5662c6acd72
+125	688	8093648306414914	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/GcStageProcess.c.obj	6140391f68a846ce
 115	704	8093648306309734	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/EncHandle.c.obj	6131d97f4552f170
 671	798	8093648311866790	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/Dequant.c.obj	13d0e436fda886bf
 500	805	8093648310157886	Source/Lib/Encoder/ASM_AVX2/CMakeFiles/ENCODER_ASM_AVX2.dir/Quant_avx2.c.obj	52fd6101e93ce03b
 489	818	8093648310042566	Source/Lib/Encoder/ASM_AVX2/CMakeFiles/ENCODER_ASM_AVX2.dir/Dwt_AVX2.c.obj	9f0ba273f8046da8
-494	824	8093648310099064	Source/Lib/Encoder/ASM_AVX2/CMakeFiles/ENCODER_ASM_AVX2.dir/NltEnc_avx2.c.obj	c512b28fe8f1b2cd
 138	2123	8093666094840811	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDecoder.cc.obj	7d68bbc3fc7c3a6f
 204	859	8093648307195752	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/PackStageProcess.c.obj	46bc236b46a58222
+494	824	8093648310099064	Source/Lib/Encoder/ASM_AVX2/CMakeFiles/ENCODER_ASM_AVX2.dir/NltEnc_avx2.c.obj	c512b28fe8f1b2cd
 610	830	8093648311258226	Source/Lib/Encoder/ASM_AVX512/CMakeFiles/ENCODER_ASM_AVX512.dir/Quant_avx512.c.obj	51895f4bcfd5e56d
 579	837	8093648310951694	Source/Lib/Encoder/ASM_AVX2/CMakeFiles/ENCODER_ASM_AVX2.dir/RateControl_avx2.c.obj	faa40c72a035ed3b
 295	845	8093648308105465	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/PreRcStageProcess.c.obj	ce240035d97bc8ae
@@ -65,19 +65,19 @@
 837	1007	8093648313530935	Source/Lib/Decoder/ASM_AVX2/CMakeFiles/DECODER_ASM_AVX2.dir/UnPack_avx2.c.obj	394563c264f5ea0c
 806	976	8093648313216829	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/Precinct.c.obj	2fd95fef67716cf8
 824	983	8093648313405475	Source/Lib/Decoder/ASM_AVX2/CMakeFiles/DECODER_ASM_AVX2.dir/Dwt53Decoder_AVX2.c.obj	8598a323566bcc47
-641	1145	8093648311571656	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/DecThreadInit.c.obj	c3efe54679a4fe35
 655	1101	8093648311712386	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/DecThreads.c.obj	81597089772e2075
+641	1145	8093648311571656	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/DecThreadInit.c.obj	c3efe54679a4fe35
 695	995	8093648312110413	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/Mct.c.obj	4d4e44137bd18fe3
-2415	2729	8093666117638720	tests/UnitTests/UnitTest_AVX512/CMakeFiles/SvtJpegxsUnitTests_AVX512.dir/CodeDeprecated-avx512.cc.obj	2e7fcbfdf8edfda4
 860	1124	8093648313755965	Source/Lib/Decoder/ASM_AVX512/CMakeFiles/DECODER_ASM_AVX512.dir/idwt-avx512.c.obj	8c0afbf4fd959b14
+2415	2729	8093666117638720	tests/UnitTests/UnitTest_AVX512/CMakeFiles/SvtJpegxsUnitTests_AVX512.dir/CodeDeprecated-avx512.cc.obj	2e7fcbfdf8edfda4
 649	1133	8093648311647678	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/DecThreadSlice.c.obj	46322a91c2534b7d
 983	1139	8093648314986584	third_party/cpuinfo/CMakeFiles/cpuinfo.dir/src/x86/isa.c.obj	42afee3ee46f4b4d
 633	1142	8093648311486021	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/DecThreadFinal.c.obj	9b9a0e73f5d41abb
 627	1148	8093648311429582	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/DecHandle.c.obj	2a483cf760c5d999
 663	1172	8093648311790478	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/Decoder.c.obj	49a51c2bcea1db37
 1101	1196	8093648316173449	Source/App/DecApp/CMakeFiles/SvtJpegxsDecApp.dir/DecParamParser.c.obj	a8e03753cb1b34c3
-2124	3682	8093666114717117	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestVariableLengthCoding.cc.obj	afb5f87303873ff4
 1125	1233	8093648316406173	Source/App/SampleEncoder/CMakeFiles/SvtJpegxsSampleEncoder.dir/main.c.obj	18274f16c658708f
+2124	3682	8093666114717117	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestVariableLengthCoding.cc.obj	afb5f87303873ff4
 812	1251	8093648313276267	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/decoder_dsp_rtcd.c.obj	16cb66c8df09a5d
 704	1274	8093648312201955	Source/Lib/Decoder/Codec/CMakeFiles/DECODER_CODEC.dir/NltDec.c.obj	4d114abf9f3fec6d
 955	1277	8093648314714530	third_party/cpuinfo/CMakeFiles/cpuinfo.dir/src/init.c.obj	e2f5287641da8491
@@ -93,22 +93,22 @@
 1118	1435	8093648316338357	Source/App/EncApp/CMakeFiles/SvtJpegxsEncApp.dir/EncAppMain.c.obj	f3765fe12367cc3a
 1345	1503	8093648318614699	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoder.exe	afe825bfcc0ae26c
 1353	1509	8093648318680866	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleDecoder.exe	501983eef91ce871
-33	1174	8093653933261910	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/CudaSmokeTest.cu.obj	34d8f7c2dd4c716d
-51	253	8093982980062543	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
-51	253	8093982980062543	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+48	2904	8093992741713946	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/CudaSmokeTest.cu.obj	28b90dbb7363ba92
+1254	1423	8094012107189577	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+1254	1423	8094012107189577	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
 1281	1431	8093648909664713	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsEncApp.exe	dc5da7895b20e2b7
-45	759	8093985262590161	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/main.cpp.obj	4ac61ce05a884daa
+46	772	8094021282000837	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/main.cpp.obj	4ac61ce05a884daa
 40	456	8093653933345128	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/BenchReport.cpp.obj	158beb2398af0876
-760	932	8093985269733894	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340
+773	948	8094021289270291	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340
 122	409	8093666094700628	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/SampleFramesData.cc.obj	cc5fea657857ce3
 116	778	8093666094644265	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/DecoderSimple.cc.obj	c513c385529de62c
-778	2872	8093666101271787	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestProfileLevel.cc.obj	4276bdfa1d676b04
 111	786	8093666094599856	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/CodeDeprecated.cc.obj	6a5e2e40c3398d9f
+778	2872	8093666101271787	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestProfileLevel.cc.obj	4276bdfa1d676b04
 106	1143	8093666094554529	third_party/googletest-1.14.0/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.obj	7ded04025c724245
 126	1224	8093666094750893	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestApiValidation.cc.obj	baca35d1afa4e878
 439	1473	8093666097872396	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestGcStageProcess.cc.obj	47f7a13cd4427105
-41	4121	8093666093900448	third_party/googletest-1.14.0/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.obj	5b7cf9d0396a0fa2
 422	1568	8093666097712404	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestFormatConvert.cc.obj	e35d40e7bac74231
+41	4121	8093666093900448	third_party/googletest-1.14.0/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.obj	5b7cf9d0396a0fa2
 481	1904	8093666098304076	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestPack.cc.obj	695296c035394186
 467	2172	8093666098164047	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestMsbAligned.cc.obj	c7526934a0473b34
 132	2268	8093666094785199	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBitstreamReadWrite.cc.obj	385884750dbcfdd4
@@ -120,54 +120,128 @@
 488	2536	8093666098365192	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestPi.cc.obj	4fc64f2538fadeeb
 148	2539	8093666094965730	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDwtFrame.cc.obj	5015118e1cdeb0e7
 1224	2541	8093666105720670	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestSample.cc.obj	9b7032c35b5582db
-1904	3494	8093666112523473	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestUnPack.cc.obj	e984b2dcc13bbee
 1569	2543	8093666109175467	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestSvtLog.cc.obj	da1003d1d5691001
+1904	3494	8093666112523473	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestUnPack.cc.obj	e984b2dcc13bbee
 786	2548	8093666101355627	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestQuant.cc.obj	d43f6c5b7a402a17
 1474	2739	8093666108223256	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestStreamProfileLevelCli.cc.obj	f31f52b8a36b75e0
 2172	2773	8093666115199363	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/__/__/Source/App/EncApp/EncAppConfig.c.obj	80dc2fba21728d17
 459	2784	8093666098077352	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestInvDwtFrame.cc.obj	a08c8f455349bc81
 428	2964	8093666097775729	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestFourComponentAlpha.cc.obj	bf5af00007bf10f4
 2380	3267	8093666117282288	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestNltCuda.cc.obj	f8795f6af20d360a
-100	3271	8093666094480718	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/NltCuda.cu.obj	2f29d689c51a6965
-94	3313	8093666094429672	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/GcCuda.cu.obj	2e4c0989a97f876f
-88	3331	8093666094369219	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	e8fea40d925d3a19
+86	3085	8093992742074363	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/NltCuda.cu.obj	43cc90aa7a188a9d
+77	3124	8093992742003874	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/GcCuda.cu.obj	cac6ccfa4366fca8
+47	1253	8094012095110335	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
 44	245	8093667358101899	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/gtest.dll	b4a94f8f504d6456
 246	419	8093667359834331	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/gtest_main.dll	6e89ed076e6ea81e
 246	419	8093667359834331	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/gtest_main.lib	6e89ed076e6ea81e
 69	692	8093667356584656	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestGcCuda.cc.obj	4262f6cef8c16a5e
 65	737	8093990603238015	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDwtCuda.cc.obj	9eef344799852ac0
-52	318	8093983210357076	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	a48ec7a9a41966fb
-48	1765	8093694820504305	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/RcQuantCuda.cu.obj	2a4aa347ed8a6be3
+48	258	8094012309757001	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	a48ec7a9a41966fb
+98	3765	8093992742210235	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/RcQuantCuda.cu.obj	7efd23fc5288f4f5
 55	885	8093694820581890	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestRcQuantCuda.cc.obj	7270c12a032db32a
 63	939	8093697264325157	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestPackCuda.cc.obj	826d24fe25f42a1c
-48	2204	8093982417511077	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/FrameContextCuda.cu.obj	8e85317b4bc3be0e
-37	2687	8093982417407362	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/EncodeFrameCuda.cu.obj	810c1a304f80c889
-47	1077	8093983121774458	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestEncodeFrameCuda.cc.obj	752253ac5f7d3e8a
-48	2904	8093992741713946	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/CudaSmokeTest.cu.obj	28b90dbb7363ba92
-86	3085	8093992742074363	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/NltCuda.cu.obj	43cc90aa7a188a9d
-77	3124	8093992742003874	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/GcCuda.cu.obj	cac6ccfa4366fca8
-57	3155	8093992741797498	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
-91	3359	8093992742105170	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/PackCuda.cu.obj	8036472e8b841523
-71	3418	8093992741941707	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/FrameContextCuda.cu.obj	72e5d8d354851429
-98	3765	8093992742210235	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/RcQuantCuda.cu.obj	7efd23fc5288f4f5
-64	4179	8093992741878769	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/EncodeFrameCuda.cu.obj	e7422e4613ab37ce
-4180	4350	8093992782997476	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
-4180	4350	8093992782997476	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
-4351	4563	8093992784740378	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	a48ec7a9a41966fb
-44	729	8093994644985988	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/main.cpp.obj	4ac61ce05a884daa
-730	902	8093994651841272	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340
 45	3239	8094003000783546	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/FrameContextCuda.cu.obj	72e5d8d354851429
 35	3656	8094003000685373	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/EncodeFrameCuda.cu.obj	e7422e4613ab37ce
-49	210	8094003498371872	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
-49	210	8094003498371872	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
 56	1156	8094003498451874	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestEncodeFrameCuda.cc.obj	752253ac5f7d3e8a
-47	255	8094003621064079	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	a48ec7a9a41966fb
-45	765	8094005393987504	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/main.cpp.obj	4ac61ce05a884daa
-766	947	8094005401193075	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340
-47	1253	8094012095110335	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
-1254	1423	8094012107189577	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
-1254	1423	8094012107189577	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
-48	258	8094012309757001	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	a48ec7a9a41966fb
-43	209	8094014245889950	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340
-46	772	8094021282000837	tests/Benchmark/CMakeFiles/SvtJpegxsBenchmark.dir/main.cpp.obj	4ac61ce05a884daa
-773	948	8094021289270291	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsBenchmark.exe	10e81d865f242340
+37	1381	8096220238712968	build.ninja	2861d4f5fe642f7f
+65	407	8096220239700721	Source/App/SampleEncoderCuda/CMakeFiles/SvtJpegxsSampleEncoderCuda.dir/main.c.obj	c107d920fa194e87
+59	519	8096220239640517	Source/App/SampleEncoderCuda/CMakeFiles/SvtJpegxsSampleEncoderCuda.dir/__/Common/PixelIo.c.obj	1e50b37f0b56292a
+45	1636	8096220239499586	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+55	1872	8096220239600186	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/FrameContextCuda.cu.obj	72e5d8d354851429
+51	2864	8096220239554870	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/EncodeFrameCuda.cu.obj	e7422e4613ab37ce
+2865	3051	8096220267702679	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+66	161	8096220411437672	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/SampleFramesData.cc.obj	c6192aa4dc0109c2
+63	655	8096220411397162	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/DecoderSimple.cc.obj	940a72df889c7cd0
+60	663	8096220411377110	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/CodeDeprecated.cc.obj	58b39c006a2d1f16
+52	667	8096220411299384	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+52	667	8096220411299384	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+96	1129	8096220411735861	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestGcStageProcess.cc.obj	6f380c60a0bf2f41
+113	1147	8096220411894963	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestPack.cc.obj	2ff8c578be701da0
+162	1193	8096220412390713	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestSample.cc.obj	d83b705ec5317c9a
+90	1433	8096220411669668	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestFormatConvert.cc.obj	5df84ae1b5079f16
+69	1475	8096220411467045	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestApiValidation.cc.obj	8af74b3fd46b8eec
+664	1536	8096220417412602	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestSvtLog.cc.obj	79bcc44ea77266b5
+127	1683	8096220412037610	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestReateControl.cc.obj	4e2053b370b01be2
+117	1694	8096220411941600	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestPi.cc.obj	dd2aa78e37e72e21
+106	1734	8096220411829717	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestMsbAligned.cc.obj	6033079063c0a547
+99	1746	8096220411760942	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestIDWT53.cc.obj	c1fb047cb97c3af1
+76	1799	8096220411533942	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDecoder.cc.obj	34a05e5cd859f59e
+110	1829	8096220411864859	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestNlt.cc.obj	e71aad3673ac9d7
+656	1855	8096220417332417	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestStreamProfileLevelCli.cc.obj	bdb98168ece30ab
+82	1924	8096220411600804	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDwtFrame.cc.obj	d59c5790697c2d7b
+124	1947	8096220412007330	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestQuant.cc.obj	e4c2b6c91f7a77ae
+79	1971	8096220411565629	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDequant.cc.obj	dc90a27ce01f2929
+86	1996	8096220411628596	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDwtIdwt.cc.obj	84e7443f588b30a5
+668	2253	8096220417452990	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestUnPack.cc.obj	c724061e63feb109
+1147	2326	8096220422248608	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/__/__/Source/App/EncApp/EncAppConfig.c.obj	273fd5088dd01eb7
+121	2364	8096220411977344	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestProfileLevel.cc.obj	4076a9f00f22ffa1
+102	2450	8096220411788735	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestInvDwtFrame.cc.obj	f4b9c7da678d92d1
+73	2454	8096220411494307	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBitstreamReadWrite.cc.obj	622b3c66fc32ce02
+93	2541	8096220411704160	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestFourComponentAlpha.cc.obj	52c687d43d466787
+1947	2738	8096220430249304	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/__/__/Source/App/Common/PixelIo.c.obj	45da4beb5b4f12f
+1434	2944	8096220425108962	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisectDwtCtx444Cuda.cc.obj	24917369f4a81c58
+1829	2961	8096220429064799	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestNltCuda.cc.obj	75e45840c533144c
+1194	3006	8096220422709201	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisect444Cuda.cc.obj	28995b48af5e2a99
+1799	3009	8096220428764704	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestGcCuda.cc.obj	b078438b73d8ab79
+1683	3083	8096220427607516	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisectRealDwtCuda.cc.obj	b1ec38dfd6130e32
+1734	3087	8096220428116974	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDwtCuda.cc.obj	7c48d0e1422f2292
+1129	3185	8096220422068295	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestVariableLengthCoding.cc.obj	33b7aaa5ab7f035d
+1536	3286	8096220426127025	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisectRealCrop444Cuda.cc.obj	68cff1a6feee6e6
+1856	3353	8096220429325629	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestPackCuda.cc.obj	1e8e5bfa4385d2
+1694	3386	8096220427707185	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisectSmall444Cuda.cc.obj	638a79c3ec004243
+1746	3397	8096220428233830	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestEncodeFrameCuda.cc.obj	94045b2b0cd05c72
+1924	3408	8096220430017308	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestRcQuantCuda.cc.obj	d2519c5e42b852d2
+1475	3424	8096220425521753	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisectRcLutRealCuda.cc.obj	bd947a9db5f5cc76
+3425	3639	8096220445023382	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
+47	1167	8096225337961189	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+1169	1369	8096225349163908	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+46	1157	8096225576570979	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+1158	1315	8096225587708894	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+47	1235	8096225814395828	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+1237	1378	8096225826280370	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+53	1221	8096226406396809	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+1223	1384	8096226418114983	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+1223	1384	8096226418114983	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+1230	1399	8096226418203852	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+1385	1614	8096226419749082	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
+57	780	8096234114733223	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDwtCuda.cc.obj	7c48d0e1422f2292
+780	1017	8096234121965363	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
+52	1175	8096234498294892	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+1177	1369	8096234509542170	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+1177	1369	8096234509542170	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+1370	1582	8096234511460733	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
+53	1483	8096235679450982	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+1490	1683	8096235693823953	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+1484	1683	8096235693771739	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+1484	1683	8096235693771739	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+1684	1983	8096235695764218	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
+55	1637	8096246147214010	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+1640	1827	8096246163065820	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+1640	1827	8096246163065820	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+1828	2102	8096246164937088	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
+58	1404	8096247182700711	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+1405	1562	8096247196179314	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+1405	1562	8096247196179314	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+1411	1569	8096247196228582	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+1563	1773	8096247197753642	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
+57	2533	8096254125250055	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/EncodeFrameCuda.cu.obj	e7422e4613ab37ce
+2534	2696	8096254150011364	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+2534	2696	8096254150011364	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+2539	2701	8096254150051545	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+2697	2910	8096254151637226	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
+47	2432	8096254809730322	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/EncodeFrameCuda.cu.obj	e7422e4613ab37ce
+2433	2588	8096254833582368	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+53	2554	8096258644353693	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/EncodeFrameCuda.cu.obj	e7422e4613ab37ce
+2560	2712	8096258669422968	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+2555	2712	8096258669376746	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+2555	2712	8096258669376746	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+2713	2923	8096258670949797	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
+60	108	8096283498911920	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/ProfileLevel.c.obj	a2e8d1b1dee3bbe
+53	342	8096283498840860	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/EncHandle.c.obj	6131d97f4552f170
+347	492	8096283501785928	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+342	492	8096283501729494	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+342	492	8096283501729494	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+64	1243	8096283498947127	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestProfileLevel.cc.obj	4076a9f00f22ffa1
+1243	1480	8096283510744784	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
+45	103	8096290717694720	Source/Lib/Encoder/Codec/CMakeFiles/ENCODER_CODEC.dir/ProfileLevel.c.obj	a2e8d1b1dee3bbe
+103	267	8096290718272938	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855

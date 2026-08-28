@@ -224,7 +224,8 @@ static SvtJxsErrorType_t encoder_init_configuration(svt_jpeg_xs_encoder_common_t
 
     enc_common->hdr_Ppih = config_struct->profile_ppih_override != 0
         ? config_struct->profile_ppih_override
-        : derive_stream_profile_ppih(enc_common->colour_format, enc_common->bit_depth, config_struct->verbose);
+        : derive_stream_profile_ppih(
+              enc_common->colour_format, enc_common->bit_depth, config_struct->ndecomp_v, config_struct->verbose);
     enc_common->hdr_Plev = config_struct->level_plev_override != 0xFFFF
         ? config_struct->level_plev_override
         : derive_stream_level_plev(config_struct->source_width,

@@ -158,6 +158,13 @@ C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleD
 C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleDecoder/CMakeFiles/list_install_components.dir
 C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleDecoder/CMakeFiles/install.dir
 C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleDecoder/CMakeFiles/install/local.dir
+C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleEncoderCuda/CMakeFiles/SvtJpegxsSampleEncoderCuda.dir
+C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleEncoderCuda/CMakeFiles/test.dir
+C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleEncoderCuda/CMakeFiles/edit_cache.dir
+C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleEncoderCuda/CMakeFiles/rebuild_cache.dir
+C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleEncoderCuda/CMakeFiles/list_install_components.dir
+C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleEncoderCuda/CMakeFiles/install.dir
+C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/Source/App/SampleEncoderCuda/CMakeFiles/install/local.dir
 C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/third_party/googletest-1.14.0/CMakeFiles/test.dir
 C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/third_party/googletest-1.14.0/CMakeFiles/edit_cache.dir
 C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/build_cuda/third_party/googletest-1.14.0/CMakeFiles/rebuild_cache.dir
