@@ -78,6 +78,20 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
                           uint32_t max_quantization, uint32_t max_refinement, const uint32_t* precinct_budget_bytes,
                           uint32_t bands_num_exists, uint32_t packets_exist_num, uint8_t* out_buffer, uint32_t* out_used_bytes);
 
+/* Read-only accessor for the per-precinct output layout inside out_buffer from
+ * the most recent svt_cuda_encode_frame() call on this ctx: precinct p's bytes
+ * occupy out_buffer[(*out_offsets)[p] .. (*out_offsets)[p] + (*out_sizes)[p]).
+ * Precinct index p corresponds 1:1 to the pi_t precinct-row index (the same
+ * indexing PackStageProcess.c uses via precincts_per_slice * slice_idx), which
+ * svt_cuda_frame_context_create_from_pi() guarantees by construction. Both
+ * arrays have ctx->precincts_num entries and point into ctx's pinned host
+ * memory -- valid until the next svt_cuda_encode_frame() call or
+ * svt_cuda_frame_context_destroy(). Used by callers (e.g. SampleEncoderCuda)
+ * to assemble a multi-slice bitstream (one write_slice_header() + memcpy per
+ * slice) without needing any change to the GPU-side kernels, which continue to
+ * process the whole frame's precincts in one batch. */
+void svt_cuda_get_precinct_layout(const SvtCudaFrameContext* ctx, const uint32_t** out_offsets, const uint32_t** out_sizes);
+
 #ifdef __cplusplus
 }
 #endif

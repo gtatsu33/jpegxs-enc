@@ -1911,3 +1911,220 @@ Phaseごとの実装手順の詳細は上記の計画ファイル側を参照す
   TODO A(graph1/DWT側の更なる最適化)・TODO B(host RC二分探索のCPU側
   最適化)・TODO C(他testdataファイルでの内訳計測)・TODO D(診断計測
   コードの整理)は今回未着手のまま持ち越し。
+
+  **[2026-08-29 セッション再開: TODO E 方針決定 = 方針B(マルチslice出力
+  組み立てまで実装)]**
+
+  ユーザーより、将来的なストリーミング対応も見据え、方針B
+  (`slice_height`をライブラリのデフォルト16に戻す)を選択。ただし調査の
+  結果、単純な設定値変更では済まないことが判明した:
+
+  - `SampleEncoderCuda/main.c`298行目の`scope_ok = (pi->slice_num == 1)`は、
+    slice数が1でない場合にCUDA検証パス自体を中断する明示的なガードで
+    あり、単なるデフォルト値の問題ではなくPhase 4aが意図的に選んだ
+    「フレーム全体を単一sliceとして扱う」というアーキテクチャ前提そのもの
+    だった。
+  - `main.c`453行目で`write_slice_header(&bw_slice, 0)`を1回だけ呼び出し、
+    `svt_cuda_encode_frame()`が返す連続したprecinctデータ全体を単一slice
+    として組み立てている。CPU版(`PackStageProcess.c`320-321行目)は
+    `prec_idx_in_slice == 0`のたびに`write_slice_header()`を呼び、slice
+    境界ごとにヘッダをインライン挿入する構造になっている。
+  - RC予算配分も同様に単純化されていた:`main.c`の
+    `compute_precinct_budgets()`はフレーム全体の`precincts_line_num`個の
+    precinctへ単一の`slice_budget_bytes`を均等配分しているが、これは
+    slice_num==1の場合にのみ正しい簡略化であり、実際のCPU版RC
+    (`PreRcStageProcess.c`55-104行目)はslice単位の予算
+    (`enc_common->slice_sizes[i]`、`RateControl.c`が算出しCPU版
+    `svt_jpeg_xs_encoder_init()`実行時点で既に確定済み)をまず決定し、
+    その予算をslice内のprecinct群へ配分する2段階構造になっている。
+
+  一方で、これらの変更に**CUDAカーネル自体の変更は不要**であることも
+  確認できた。`EncodeFrameCuda.cu`の`svt_cuda_encode_frame()`は、pack
+  カーネル起動前(ホスト側RCの二分探索完了時点、2033-2037行目)で既に
+  precinct単位の出力オフセット(`ctx->h_out_offset[pr]`)とバイト長
+  (`ctx->h_total_bytes[pr]`)をホストメモリ上に持っている。また
+  `svt_cuda_frame_context_create_from_pi()`(116-120行目)の内部チェックに
+  より、ctxのprecinct配列のインデックスは常に`pi->precincts_line_num`と
+  1対1で対応することが保証されている(CPU版の`prec_first_idx =
+  precincts_per_slice * slice_idx`と同じ添字空間)。つまりslice境界での
+  ヘッダ挿入は、この既存のホスト側配列を使った「範囲ごとのmemcpy」だけで
+  実現でき、GPU側のDWT/量子化/Packカーネルはフレーム全体を一括処理する
+  現行方式のまま変更しなくてよい。
+
+  **実装方針(次回実装対象、ユーザー確認待ち)**:
+
+  1. `EncodeFrameCuda.cuh`に、`ctx`が保持するprecinct単位のオフセット・
+     バイト長配列を読み取る新しいアクセサ関数を追加する(例:
+     `void svt_cuda_get_precinct_layout(const SvtCudaFrameContext* ctx,
+     const uint32_t** out_offsets, const uint32_t** out_sizes)`)。
+     既存の`svt_cuda_encode_frame()`のシグネチャ自体は変更せず、既存の
+     呼び出し元(`TestEncodeFrameCuda.cc`等)への影響を避ける。
+  2. `SampleEncoderCuda/main.c`:
+     - 298行目の`scope_ok`から「slice_num==1」判定を外す(band幾何一様性の
+       チェックはPhase 4aの本来のスコープ制約として維持)。
+     - `compute_precinct_budgets()`の呼び出しを、`enc_common->slice_sizes[]`
+       を使ったslice単位の2段階配分に変更する(CPU版
+       `PreRcStageProcess.c`96-104行目の`slice_budget_bytes`算出式を踏襲)。
+     - 435行目付近のビットストリームサイズ計算・322行目付近の
+       `slice_budget_bytes`計算を、`SLICE_HEADER_SIZE_BYTES`の1回分ではなく
+       `* pi->slice_num`に修正する(`EncHandle.c`779行目と同じ式)。
+     - 451-457行目の単一slice組み立てを、`pi->slice_num`回ループし、各回で
+       `write_slice_header(&bw_slice, slice_idx)` + 対応するprecinct範囲の
+       `memcpy`(範囲は上記アクセサで得た`out_offsets`/`out_sizes`から算出)
+       に変更する。
+  3. 検証: testdata 3ファイルすべてで`slice_height=16`(ライブラリデフォルト)
+     状態でCPU版・CUDA版がbit-exactであることを確認。さらにISO参照デコーダ
+     (git非追跡・スクラッチ領域)で全3ファイルが`exit:0`で復号できることを
+     確認する。既存の`*Cuda*`テスト35/35・全回帰スイートで無回帰であることも
+     確認する。
+  4. 完了後、`derive_stream_profile_ppih()`は現状のdecom_v対応版のまま
+     (Unrestrictedへのフォールバックは不要になる想定)で、TODO Eの完了条件
+     (testdata全3ファイルのISO参照デコーダでの復号成功)を満たせる見込み。
+
+  上記1〜4がユーザー確認待ちの実装計画。確認が取れ次第、実装に着手する。
+
+  **[2026-08-29 方針B 実装完了]**
+
+  ユーザー確認("OK")を受け、上記1〜3のとおり実装した:
+
+  - `EncodeFrameCuda.cuh`/`.cu`に読み取り専用アクセサ
+    `svt_cuda_get_precinct_layout()`を追加(`svt_cuda_encode_frame()`の
+    シグネチャ自体は不変)。ctxの`h_out_offset`/`h_total_bytes`をそのまま
+    返すだけで、GPU側のカーネル・グラフキャプチャには一切手を加えていない。
+  - `SampleEncoderCuda/main.c`: `enc.slice_height = image.height`の上書きを
+    削除(ライブラリデフォルト16を使用)。`scope_ok`から`slice_num==1`判定を
+    除去(band幾何一様性チェックのみ残す)。RC予算配分を
+    `enc_common->slice_sizes[]`(`PreRcStageProcess.c`と同じ式)によるslice
+    単位の配分→`compute_precinct_budgets()`によるslice内precinct配分の
+    2段階に変更。ビットストリーム組み立てを`pi->slice_num`回のループに変更し、
+    各slice境界で`write_slice_header()`を呼び、対応するprecinctバイト範囲
+    (アクセサから取得したオフセット・長さ)をmemcpyする方式にした。
+
+  **検証結果**:
+  - CUDAビルド(build_cuda)成功、警告のみ(既存のコードページ警告、無関係)。
+  - `*Cuda*`テスト35/35 pass(既存の`TestEncodeFrameCuda.cc`は独自の単一slice
+    ジオメトリで検証しているため無変更・無影響)。
+  - testdata 3ファイル全てbpp=4で再エンコード、**CPU/CUDA bit-exact一致
+    (YES)を維持**(chart_color: 7.30x, eval_fantom1: 7.50x,
+    test_1920x1080_yuv422p8: 5.33xのCPU/CUDA速度比、slice_height=16化後も
+    速度面で悪化なし)。
+  - ISO参照デコーダ(git非追跡・スクラッチ領域)で検証:
+    - **chart_color**: `p=high444.12;...;size=4147200`、135個のslice
+      ヘッダ(2160/16=135)を正しく読み、`exit:0`で復号成功。
+    - **eval_fantom1**: 同上、`exit:0`で復号成功。
+    - **test_1920x1080_yuv422p8**: `p=main422.10;...;nly=2`で
+      `Error: Unsupported number of vertical decompositions for selected
+      profile`により復号拒否。これはslice_heightとは無関係の、既知・
+      修正不能な規格側の制限(4:2:2/4:0:0サンプリングにはISO/IEC 21122-2上
+      High相当のプロファイルが定義されていないため、decom_v=2との組み合わせを
+      正しく宣言できるPpihが存在しない)であり、想定どおりの結果。
+  - decoded PPM(chart_color)の簡易サニティチェック: ファイルサイズ完全一致
+    (49766418バイト)、ヘッダ一致。正確なPSNR算出は10bit(2byte/sample)の
+    バイト境界を考慮したパーサが必要なため今回は実施していない(byte単位の
+    粗い差分は非ゼロだが、bpp=4のロッシー圧縮としては想定内)。
+  - 全回帰スイート(`SvtJpegxsUnitTests.exe`、フィルタなし全件、CUDAビルド):
+    **12076件中12074件pass、2件skip(`Yuv444_4444/FourComponentEncodeParam.
+    EncodesSuccessfully/2`・`Yuv422Alpha/FourComponentEncodeParam.
+    EncodesSuccessfully/2`、いずれも既知の既存スキップで本セッションの
+    変更と無関係)、無回帰を確認**。
+
+  **[2026-08-29 追記: 4:2:2パスの再検討、ユーザー指摘]**
+
+  ユーザーより「422のテストはmainプロファイルに切り替えればいいのでは」との
+  指摘。再確認したところ、`main422.10`という宣言自体は正しい選択
+  (4:2:2/4:0:0にHighプロファイルはISO/IEC 21122-2上そもそも存在しないため、
+  唯一選べる名前付きプロファイル)であり、ISO参照デコーダが拒否したのは
+  **宣言(Ppih)と実際の符号化(decom_v=2、ライブラリのデフォルト値)が
+  食い違っていたため**と判明した。つまり必要な対応は「プロファイルの
+  切り替え」ではなく、**「実際の垂直分解数をMainプロファイルの制約
+  (NLy≤1、すなわちdecom_v=1)に合わせる」**こと。`SampleEncoderCuda`の
+  4:2:2テストケースで`enc.ndecomp_v = 1`を明示指定すれば、宣言と実装が
+  一致しISO参照デコーダでも復号できる見込み。この修正は本セッションの
+  スコープ(`SampleEncoderCuda`のテストパラメータ)に閉じており、ライブラリ
+  本体のデフォルト値(`ndecomp_v=2`、全カラーフォーマット共通)は変更しない
+  (4:2:2/4:0:0全般でdecom_vを制限すべきかは別途検討すべき、より大きな
+  設計判断のため、TODO Fと合わせて将来課題とする)。
+
+  **実装・検証完了**: `SampleEncoderCuda/main.c`の4:2:2入力パスに
+  `enc.ndecomp_v = 1`を追加(理由をコメントに明記)。再ビルド・再検証の結果:
+  - CPU/CUDA bit-exact一致を維持(YES、速度比5.33xで変化なし)。
+  - ISO参照デコーダで`p=main422.10;...`(`nly`フィールドは省略、decom_v=1が
+    Mainの制約内に収まるため)を読み取り、**`exit:0`で復号成功**。
+  - `*Cuda*`テスト35/35 pass、無回帰。
+
+  **結論(TODO E)**: testdata **3ファイル全て**が方針B(slice_height=16)+
+  4:2:2パスの`ndecomp_v=1`指定により、ISO/IEC 21122公式リファレンス
+  デコーダでの独立検証に完全合格した。TODO Eはこれで完了とする。
+  (ライブラリ本体の`ndecomp_v`デフォルト値[全カラーフォーマット共通で2]を
+  4:2:2/4:0:0時に自動的に1へ制限すべきかは、`SampleEncoderCuda`というテスト
+  アプリのスコープを超える設計判断のため、TODO Fの`profile_ppih_override`
+  ギャップ解消と合わせて将来課題とする。)
+
+  **[2026-08-29 追記: 画質評価(PSNR)]**
+
+  ユーザーの指摘を受け、独自の16bit PPM/8bit raw対応PSNR計測ツール
+  (スクラッチ領域、git非追跡)で復号結果 vs 元画像のPSNRを計測した:
+  - chart_color(444 RGB, 10bit, bpp=4): **PSNR 43.87 dB**
+  - eval_fantom1(444 RGB, 10bit, bpp=4): **PSNR 42.69 dB**
+  - test_1920x1080_yuv422p8(bpp=4): **PSNR 14.62 dB**(異常に低い)
+
+  yuv422p8のみ極端に低い値だったため原因を切り分けた:
+  1. `ndecomp_v=1`と`=2`(変更前のデフォルト)で比較してもPSNRはほぼ同じ
+     (14.62dB vs 14.82dB)→ 本セッションの`ndecomp_v`変更が原因ではない。
+  2. ISO参照デコーダで復号した結果と、このリポジトリ自身のデコーダ
+     (`SvtJpegxsDecApp.exe`)でCPU版ビットストリームを復号した結果が
+     **完全に同一のPSNR**→ デコーダ側のプレーン順序/フォーマット非互換が
+     原因ではない(`programs/converters/planar.c`のコンポーネント順序
+     [Y,U,V]が入力側`PixelIo.c`の`pixel_image_load_yuv422p8()`の想定と
+     一致していることも確認済み)。
+  3. `test_1920x1080_yuv422p8.yuv`のバイト列そのものを確認したところ、
+     空間的相関の無い乱数値であり、実写・自然画像ではなく**ビットストリーム
+     構造検証用の合成テストパターン**であることが判明した。
+
+  **結論**: 低PSNRはエンコーダ・デコーダのバグではなく、非圧縮性の
+  合成テストパターンをbpp=4(4:1圧縮)まで強制的にレート制御した結果として
+  正常な挙動。444系の実写コンテンツ2件はbpp=4で40dB超の高画質を確認できて
+  おり、本セッションのマルチslice実装・プロファイル修正が画質に悪影響を
+  与えていないことが確認できた。
+
+  **[2026-08-29 追記: 画質確認(目視)]**
+
+  復号結果をffmpegでPNG化し目視確認(スクラッチ領域、git非追跡)。
+  chart_color・eval_fantom1とも元画像との差は目視では判別できず、
+  ブロックノイズ・リンギング等の圧縮アーティファクトも確認されなかった
+  (PSNR 43.87dB/42.69dBという数値と整合)。test_1920x1080_yuv422p8は
+  目視でも完全な砂嵐状のランダムノイズ画像であることを確認し、上記の
+  「合成テストパターンである」という結論を裏付けた。
+
+  **[2026-08-29 追記: エンコード処理時間の内訳(最終結果)]**
+
+  `SVT_CUDA_PROFILE=1`による診断計測(既存、graph1/graph2とは別の一時的な
+  CUDA Graphで計測するため本番のwarm実行時間には影響しない設計)をtestdata
+  3ファイル全てに対して実行し、各フェーズの処理時間を確認した。診断計測
+  ON/OFFでwarm時間(10ms/9ms/3ms)が変化しないことも実測で確認済み
+  (計測がcold時間[12→25ms/12→22ms/5→7ms]のみを押し上げ、warm時間には
+  影響しないことを確認)。
+
+  | フェーズ | chart_color(4K 444) | eval_fantom1(4K 444) | yuv422p8(1080p 422) |
+  |---|---|---|---|
+  | graph1合計(NLT+DWT+GC+RC-LUT) | 7.015 ms | 6.700 ms | 1.563 ms |
+  | ├ NLT+DWT(cold時参考値) | 5.930 ms | 5.839 ms | 1.069 ms |
+  | ├ GC+sig+RC-LUT+D2H(cold時参考値) | 1.376 ms | 1.280 ms | 0.643 ms |
+  | host RC二分探索(CPU側、graph間) | 1.369 ms | 1.216 ms | 0.851 ms |
+  | graph2合計(quantize+pack) | 1.821 ms | 1.825 ms | 0.396 ms |
+  | ├ H2D+quantize(cold時参考値) | 1.025 ms | 1.047 ms | 0.194 ms |
+  | ├ quantize only(cold時参考値) | 0.837 ms | 0.838 ms | 0.074 ms |
+  | ├ pack(cold時参考値) | 0.483 ms | 0.275 ms | 0.085 ms |
+  | 合計(graph1+RC+graph2) | 10.21 ms | 9.74 ms | 2.81 ms |
+  | 報告されているwarm時間(2回目呼び出し) | 10.000 ms | 9.000 ms | 3.000 ms |
+
+  「cold時参考値」の行(NLT+DWT/GC等/H2D+quantize/quantize only/pack)は、
+  診断計測の設計上**初回(cold)呼び出し時にのみ**測定される値(既存の
+  `efc_graph2_needs_recapture()`等によるゲート、再計測は稀な
+  recaptureタイミングのみ)。graph1合計・host RC・graph2合計の行は毎回
+  (warm含む)出力される値であり、これはwarm実測値そのものである。より
+  細かい内訳をwarm呼び出し時にも取得したい場合は、診断コードをwarm時にも
+  動くよう拡張する対応が必要になるが、その場合も現在の「本番グラフとは
+  別の一時グラフで計測する」設計を維持しないと、warm時間自体に計測
+  オーバーヘッドが乗ってしまう点に注意が必要(将来の拡張課題として
+  記録するのみで、本セッションでは対応しない)。

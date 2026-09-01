@@ -2313,3 +2313,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
     *out_used_bytes = running;
     return 0;
 }
+
+void svt_cuda_get_precinct_layout(const SvtCudaFrameContext* ctx, const uint32_t** out_offsets, const uint32_t** out_sizes) {
+    *out_offsets = ctx->h_out_offset;
+    *out_sizes = ctx->h_total_bytes;
+}

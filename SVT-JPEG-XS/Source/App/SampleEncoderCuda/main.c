@@ -14,11 +14,18 @@
  * CPU-vs-CUDA bit-exactness as an automated test.
  *
  * Scope (Phase 4a, inherited unchanged): VPRED disabled, Signs handling=OFF,
- * single slice (slice_height=source_height), RC_CBR_PER_PRECINCT (not the
- * default move-padding mode), and every precinct row must share the same
- * (NORMAL) band geometry -- i.e. source_height must be evenly divisible by
- * the precinct height. Inputs outside this scope are rejected with an error
- * message rather than silently adjusted.
+ * RC_CBR_PER_PRECINCT (not the default move-padding mode), and every
+ * precinct row must share the same (NORMAL) band geometry -- i.e.
+ * source_height must be evenly divisible by the precinct height. Inputs
+ * outside this scope are rejected with an error message rather than
+ * silently adjusted.
+ *
+ * Multi-slice (2026-08-29, see PortingStrategy.txt TODO E): slice_height
+ * uses the library default (16), matching the ISO/IEC 21122-2 structural
+ * requirement for any named (Main/High) profile. svt_cuda_encode_frame()
+ * still processes every precinct of the whole frame in one GPU batch --
+ * only this app's host-side RC-budget split and bitstream assembly are
+ * slice-aware, via svt_cuda_get_precinct_layout().
  */
 
 #include <SvtJpegxsEnc.h>
@@ -162,7 +169,7 @@ int32_t main(int32_t argc, char *argv[]) {
         printf("                 width/height parsed from a \"_WIDTHxHEIGHT_\" token in the filename\n");
         printf("  output_prefix  bitstreams are written to <output_prefix>.cpu.jxs / .cuda.jxs\n");
         printf("  bpp            optional target bits-per-pixel, integer or decimal (e.g. 0.5, 3, 3.75). Default: 3\n");
-        printf("Scope: single slice, RC_CBR_PER_PRECINCT, source_height evenly divisible by\n");
+        printf("Scope: RC_CBR_PER_PRECINCT, source_height evenly divisible by\n");
         printf("the precinct height (see PortingStrategy.txt section 12 / Phase 4a).\n");
         return -1;
     }
@@ -201,9 +208,21 @@ int32_t main(int32_t argc, char *argv[]) {
     enc.source_height = image.height;
     enc.input_bit_depth = (uint8_t)image.bit_depth;
     enc.colour_format = is_yuv ? COLOUR_FORMAT_PLANAR_YUV422 : COLOUR_FORMAT_PLANAR_YUV444_OR_RGB;
+    if (is_yuv) {
+        /* ISO/IEC 21122-2 defines no "High" (NLy<=2) profile for 4:2:2/4:0:0
+         * sampling -- Main (NLy<=1) is the only named profile available, so
+         * the actual vertical decomposition must be capped to match it (the
+         * library default is ndecomp_v=2, which would make the declared
+         * Main422.10 profile's Nly field a lie). See PortingStrategy.txt
+         * TODO E. */
+        enc.ndecomp_v = 1;
+    }
     parse_bpp_arg(bpp_arg, &enc.bpp_numerator, &enc.bpp_denominator);
     enc.threads_num = 1; /* single-threaded CPU reference, matching the timing methodology in PortingStrategy.txt section 10 */
-    enc.slice_height = image.height;         /* Phase 4a scope: single slice */
+    /* slice_height left at the library default (16, set by
+     * svt_jpeg_xs_encoder_load_default_parameters()) -- see PortingStrategy.txt
+     * TODO E: an image-height single slice made every named (Main/High)
+     * profile declaration structurally non-conformant. */
     enc.rate_control_mode = RC_CBR_PER_PRECINCT; /* Phase 4a scope: no move-padding */
 
     err = svt_jpeg_xs_encoder_init(SVT_JPEGXS_API_VER_MAJOR, SVT_JPEGXS_API_VER_MINOR, &enc);
@@ -295,16 +314,14 @@ int32_t main(int32_t argc, char *argv[]) {
     svt_jpeg_xs_encoder_common_t *enc_common = &prv->enc_common;
     pi_t *pi = &enc_common->pi;
 
-    int scope_ok = (pi->slice_num == 1);
-    if (scope_ok) {
-        for (uint32_t c = 0; c < pi->comps_num && scope_ok; c++) {
-            for (uint32_t b = 0; b < pi->components[c].bands_num; b++) {
-                const precinct_band_info_t *nb = &pi->p_info[PRECINCT_NORMAL].b_info[c][b];
-                const precinct_band_info_t *lb = &pi->p_info[PRECINCT_LAST_NORMAL].b_info[c][b];
-                if (nb->width != lb->width || nb->height != lb->height) {
-                    scope_ok = 0;
-                    break;
-                }
+    int scope_ok = 1;
+    for (uint32_t c = 0; c < pi->comps_num && scope_ok; c++) {
+        for (uint32_t b = 0; b < pi->components[c].bands_num; b++) {
+            const precinct_band_info_t *nb = &pi->p_info[PRECINCT_NORMAL].b_info[c][b];
+            const precinct_band_info_t *lb = &pi->p_info[PRECINCT_LAST_NORMAL].b_info[c][b];
+            if (nb->width != lb->width || nb->height != lb->height) {
+                scope_ok = 0;
+                break;
             }
         }
     }
@@ -319,8 +336,10 @@ int32_t main(int32_t argc, char *argv[]) {
         return 2;
     }
 
-    uint32_t slice_budget_bytes = enc_common->picture_header_dynamic.hdr_Lcod - enc_common->frame_header_length_bytes -
-        SLICE_HEADER_SIZE_BYTES - CODESTREAM_SIZE_BYTES;
+    /* Total precinct-data budget across the whole frame (all slices), matching
+     * EncHandle.c's size_all_precincts_bytes formula. */
+    uint32_t total_precinct_budget_bytes = enc_common->picture_header_dynamic.hdr_Lcod - enc_common->frame_header_length_bytes -
+        SLICE_HEADER_SIZE_BYTES * pi->slice_num - CODESTREAM_SIZE_BYTES;
     uint32_t *precinct_budgets = malloc(sizeof(uint32_t) * pi->precincts_line_num);
     if (!precinct_budgets) {
         free(out_buf.buffer);
@@ -328,11 +347,24 @@ int32_t main(int32_t argc, char *argv[]) {
         svt_jpeg_xs_encoder_close(&enc);
         return SvtJxsErrorInsufficientResources;
     }
-    compute_precinct_budgets(pi->precincts_line_num, slice_budget_bytes, precinct_budgets);
+    /* Split the per-precinct budget in two stages, exactly matching
+     * PreRcStageProcess.c (per-slice budget from enc_common->slice_sizes[])
+     * then PackStageProcess.c:594-601 (even split within the slice, RC_CBR_
+     * PER_PRECINCT branch) -- required for CPU/CUDA bit-exactness once
+     * slice_num > 1. */
+    for (uint32_t slice_idx = 0; slice_idx < pi->slice_num; slice_idx++) {
+        uint32_t prec_first_idx = pi->precincts_per_slice * slice_idx;
+        uint32_t prec_num_in_slice = (slice_idx + 1 < pi->slice_num) ? pi->precincts_per_slice
+                                                                      : pi->precincts_line_num - prec_first_idx;
+        uint32_t this_slice_budget_bytes = (slice_idx + 1 < pi->slice_num)
+            ? enc_common->slice_sizes[slice_idx] - SLICE_HEADER_SIZE_BYTES
+            : enc_common->slice_sizes[slice_idx] - SLICE_HEADER_SIZE_BYTES - CODESTREAM_SIZE_BYTES;
+        compute_precinct_budgets(prec_num_in_slice, this_slice_budget_bytes, precinct_budgets + prec_first_idx);
+    }
 
     SvtCudaFrameContext ctx;
     memset(&ctx, 0, sizeof(ctx));
-    int rc = svt_cuda_frame_context_create_from_pi(&ctx, pi, &enc_common->pi_enc, slice_budget_bytes + 4096);
+    int rc = svt_cuda_frame_context_create_from_pi(&ctx, pi, &enc_common->pi_enc, total_precinct_budget_bytes + 4096);
     if (rc != 0) {
         printf("svt_cuda_frame_context_create_from_pi failed: %d\n", rc);
         free(precinct_budgets);
@@ -349,7 +381,7 @@ int32_t main(int32_t argc, char *argv[]) {
         in_stride[c] = in_buf->stride[c];
     }
 
-    uint32_t precinct_capacity = slice_budget_bytes + 4096;
+    uint32_t precinct_capacity = total_precinct_budget_bytes + 4096;
     uint8_t *precinct_data = malloc(precinct_capacity);
     uint32_t precinct_used_bytes = 0;
     if (!precinct_data) {
@@ -429,11 +461,14 @@ int32_t main(int32_t argc, char *argv[]) {
         return -1;
     }
 
-    /* --- Assemble: frame header + slice header + precinct data + tail (same
-     * layout the real encoder produces; svt_cuda_encode_frame() only ports
-     * the precinct data path, see EncodeFrameCuda.cuh). --- */
-    uint32_t cuda_bitstream_size = enc_common->frame_header_length_bytes + SLICE_HEADER_SIZE_BYTES + precinct_used_bytes +
-        CODESTREAM_SIZE_BYTES;
+    /* --- Assemble: frame header + (slice header + precinct data) per slice +
+     * tail (same layout the real encoder produces; svt_cuda_encode_frame()
+     * only ports the precinct data path, see EncodeFrameCuda.cuh). Per-slice
+     * byte ranges within precinct_data come from svt_cuda_get_precinct_layout()
+     * -- precinct index there is 1:1 with pi_t's precinct-row index, same as
+     * PackStageProcess.c's precincts_per_slice * slice_idx indexing. --- */
+    uint32_t cuda_bitstream_size = enc_common->frame_header_length_bytes + SLICE_HEADER_SIZE_BYTES * pi->slice_num +
+        precinct_used_bytes + CODESTREAM_SIZE_BYTES;
     uint8_t *cuda_bitstream = malloc(cuda_bitstream_size);
     if (!cuda_bitstream) {
         free(precinct_data);
@@ -448,13 +483,26 @@ int32_t main(int32_t argc, char *argv[]) {
     memcpy(cuda_bitstream + offset, enc_common->frame_header_buffer, enc_common->frame_header_length_bytes);
     offset += enc_common->frame_header_length_bytes;
 
-    bitstream_writer_t bw_slice;
-    bitstream_writer_init(&bw_slice, cuda_bitstream + offset, SLICE_HEADER_SIZE_BYTES);
-    write_slice_header(&bw_slice, 0);
-    offset += SLICE_HEADER_SIZE_BYTES;
+    const uint32_t *precinct_offsets = NULL;
+    const uint32_t *precinct_sizes = NULL;
+    svt_cuda_get_precinct_layout(&ctx, &precinct_offsets, &precinct_sizes);
 
-    memcpy(cuda_bitstream + offset, precinct_data, precinct_used_bytes);
-    offset += precinct_used_bytes;
+    for (uint32_t slice_idx = 0; slice_idx < pi->slice_num; slice_idx++) {
+        uint32_t prec_first_idx = pi->precincts_per_slice * slice_idx;
+        uint32_t prec_num_in_slice = (slice_idx + 1 < pi->slice_num) ? pi->precincts_per_slice
+                                                                      : pi->precincts_line_num - prec_first_idx;
+        uint32_t prec_last_idx = prec_first_idx + prec_num_in_slice - 1;
+        uint32_t slice_byte_start = precinct_offsets[prec_first_idx];
+        uint32_t slice_byte_len = precinct_offsets[prec_last_idx] + precinct_sizes[prec_last_idx] - slice_byte_start;
+
+        bitstream_writer_t bw_slice;
+        bitstream_writer_init(&bw_slice, cuda_bitstream + offset, SLICE_HEADER_SIZE_BYTES);
+        write_slice_header(&bw_slice, (int)slice_idx);
+        offset += SLICE_HEADER_SIZE_BYTES;
+
+        memcpy(cuda_bitstream + offset, precinct_data + slice_byte_start, slice_byte_len);
+        offset += slice_byte_len;
+    }
 
     bitstream_writer_t bw_tail;
     bitstream_writer_init(&bw_tail, cuda_bitstream + offset, CODESTREAM_SIZE_BYTES);
