@@ -564,7 +564,8 @@ static void bench_phase4_full_frame(BenchReport& report, uint32_t width, uint32_
                               (uint8_t)enc_common->coding_significance,
                               (uint8_t)enc_common->picture_header_dynamic.hdr_Rl, enc_common->pi_enc.max_quantization,
                               enc_common->pi_enc.max_refinement, precinct_budgets.data(), pi->bands_num_exists,
-                              (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, precinct_data.data(), &used);
+                              (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, 0 /* is_packed_input */,
+                              precinct_data.data(), &used);
     });
     report.add(r);
 
@@ -693,8 +694,8 @@ static void bench_phase4_recapture_behavior(uint32_t width, uint32_t height, int
                                            (uint8_t)enc_common->coding_significance,
                                            (uint8_t)enc_common->picture_header_dynamic.hdr_Rl, enc_common->pi_enc.max_quantization,
                                            enc_common->pi_enc.max_refinement, precinct_budgets.data(), pi->bands_num_exists,
-                                           (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, precinct_data.data(),
-                                           &used);
+                                           (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, 0 /* is_packed_input */,
+                                           precinct_data.data(), &used);
             double ms = timer.stop_ms();
             printf("  frame %2d: %7.3f ms  (addr=%p)%s\n", f, ms, (void*)in_buf->data_yuv[0], rc != 0 ? "  [ERROR]" : "");
         }

@@ -45,7 +45,16 @@ int svt_cuda_frame_context_create_from_pi(SvtCudaFrameContext* ctx, const pi_t* 
  * pi/pi_enc the context was created from).
  *
  * in_planes[c] / in_stride[c]: host input planes, one per component (matches
- *   svt_jpeg_xs_image_buffer_t::data_yuv/stride).
+ *   svt_jpeg_xs_image_buffer_t::data_yuv/stride). When is_packed_input is
+ *   set, only in_planes[0]/in_stride[0] are used: in_planes[0] is the single
+ *   packed(AoS) host buffer (RGBRGB...), in_stride[0] is its row stride in
+ *   samples (comp_width * comps_num); in_planes[1..]/in_stride[1..] are
+ *   ignored. Scope: packed input is only meaningful for comps_num==3,
+ *   equal-dimension components (RGB/444), matching
+ *   COLOUR_FORMAT_PACKED_YUV444_OR_RGB -- ctx must have been created with
+ *   that geometry. See PortingStrategy.txt "channel-interleaved input"
+ *   section for the rationale (this avoids the CPU-side deinterleave the
+ *   caller would otherwise have to do before calling this function).
  * input_bit_depth, hdr_Bw, hdr_Fq: matches NltCuda/DwtCuda's parameters.
  * quant_type: 0 = QUANT_TYPE_DEADZONE, 1 = QUANT_TYPE_UNIFORM.
  * use_short_header: matches pi_t::use_short_header.
@@ -76,7 +85,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
                           uint32_t decom_h, uint32_t decom_v, uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq,
                           uint8_t quant_type, uint8_t use_short_header, uint8_t coding_significance, uint8_t coding_raw_enable,
                           uint32_t max_quantization, uint32_t max_refinement, const uint32_t* precinct_budget_bytes,
-                          uint32_t bands_num_exists, uint32_t packets_exist_num, uint8_t* out_buffer, uint32_t* out_used_bytes);
+                          uint32_t bands_num_exists, uint32_t packets_exist_num, uint8_t is_packed_input, uint8_t* out_buffer,
+                          uint32_t* out_used_bytes);
 
 /* Read-only accessor for the per-precinct output layout inside out_buffer from
  * the most recent svt_cuda_encode_frame() call on this ctx: precinct p's bytes

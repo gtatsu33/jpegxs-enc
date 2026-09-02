@@ -173,8 +173,8 @@ static void run_encode_frame_cuda_vs_cpu(uint32_t width, uint32_t height, uint8_
                                (uint8_t)enc_common->coding_significance,
                                (uint8_t)enc_common->picture_header_dynamic.hdr_Rl, enc_common->pi_enc.max_quantization,
                                enc_common->pi_enc.max_refinement, precinct_budgets.data(), pi->bands_num_exists,
-                               (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, precinct_data.data(),
-                               &precinct_used_bytes);
+                               (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, 0 /* is_packed_input */,
+                               precinct_data.data(), &precinct_used_bytes);
     ASSERT_EQ(rc, 0);
 
     /* --- Assemble: frame header + slice header + precinct data + tail. --- */
@@ -213,8 +213,8 @@ static void run_encode_frame_cuda_vs_cpu(uint32_t width, uint32_t height, uint8_
                                (uint8_t)enc_common->coding_significance,
                                (uint8_t)enc_common->picture_header_dynamic.hdr_Rl, enc_common->pi_enc.max_quantization,
                                enc_common->pi_enc.max_refinement, precinct_budgets.data(), pi->bands_num_exists,
-                               (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, precinct_data2.data(),
-                               &precinct_used_bytes2);
+                               (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, 0 /* is_packed_input */,
+                               precinct_data2.data(), &precinct_used_bytes2);
     ASSERT_EQ(rc, 0);
     EXPECT_EQ(precinct_used_bytes2, precinct_used_bytes);
     EXPECT_EQ(memcmp(precinct_data2.data(), precinct_data.data(), precinct_used_bytes), 0);
@@ -361,8 +361,8 @@ static void run_encode_frame_cuda_vs_cpu_real_ppm(const char* ppm_path, uint32_t
                                (uint8_t)enc_common->coding_significance,
                                (uint8_t)enc_common->picture_header_dynamic.hdr_Rl, enc_common->pi_enc.max_quantization,
                                enc_common->pi_enc.max_refinement, precinct_budgets.data(), pi->bands_num_exists,
-                               (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, precinct_data.data(),
-                               &precinct_used_bytes);
+                               (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, 0 /* is_packed_input */,
+                               precinct_data.data(), &precinct_used_bytes);
     ASSERT_EQ(rc, 0);
 
     /* --- Assemble: frame header + slice header + precinct data + tail. --- */

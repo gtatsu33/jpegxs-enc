@@ -279,6 +279,60 @@ static int efc_run_dwt(SvtCudaFrameContext* ctx, uint32_t comp_id, const void* i
     return err;
 }
 
+/* Packed-input counterpart of efc_run_dwt(): ctx->d_in_raw_planes[comp_id] is
+ * assumed already filled by efc_run_deinterleave_packed() below, so this
+ * skips straight to the shared NLT/DWT pipeline via
+ * svt_cuda_dwt_component_ctx_prefilled(). See PortingStrategy.txt
+ * "channel-interleaved input" section. */
+static int efc_run_dwt_prefilled(SvtCudaFrameContext* ctx, uint32_t comp_id, uint32_t decom_h, uint32_t decom_v,
+                                 uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq) {
+    uint32_t w = ctx->comp_width[comp_id], h = ctx->comp_height[comp_id];
+    return svt_cuda_dwt_component_ctx_prefilled(w,
+                                                h,
+                                                decom_h,
+                                                decom_v,
+                                                input_bit_depth,
+                                                hdr_Bw,
+                                                hdr_Fq,
+                                                ctx->d_in_raw_planes[comp_id],
+                                                ctx->d_cur,
+                                                ctx->d_other,
+                                                ctx->d_vert,
+                                                ctx->d_pyramid32,
+                                                ctx->d_pyramid16[comp_id],
+                                                ctx->stream);
+}
+
+/* Runs once per frame (not per component, unlike efc_run_dwt): H2D-copies the
+ * whole packed(AoS) frame in one contiguous transfer into ctx->d_packed_in,
+ * then deinterleaves it into ctx->d_in_raw_planes[0..2] in a single fused
+ * kernel pass. Must be called before the per-component efc_run_dwt_prefilled()
+ * loop. Scope: comps_num==3, equal-dimension components only (RGB/444), same
+ * as svt_cuda_encode_frame()'s is_packed_input contract. */
+static int efc_run_deinterleave_packed(SvtCudaFrameContext* ctx, const void* packed_in, uint32_t packed_stride,
+                                       uint8_t input_bit_depth) {
+    uint32_t w = ctx->comp_width[0], h = ctx->comp_height[0];
+    size_t in_elem_size = (input_bit_depth <= 8) ? sizeof(uint8_t) : sizeof(uint16_t);
+    cudaError_t err = cudaMemcpy2DAsync(ctx->d_packed_in,
+                                        (size_t)w * 3 * in_elem_size, /* dst pitch: d_packed_in is compact, no padding */
+                                        packed_in,
+                                        packed_stride * in_elem_size, /* src pitch: caller's row stride, may include padding */
+                                        (size_t)w * 3 * in_elem_size,
+                                        h,
+                                        cudaMemcpyHostToDevice,
+                                        ctx->stream);
+    if (err != cudaSuccess) {
+        return (int)err;
+    }
+    return svt_cuda_deinterleave_packed_rgb(ctx->d_packed_in,
+                                            ctx->d_in_raw_planes[0],
+                                            ctx->d_in_raw_planes[1],
+                                            ctx->d_in_raw_planes[2],
+                                            w * h,
+                                            input_bit_depth,
+                                            ctx->stream);
+}
+
 /* =====================================================================
  * 3. Batched GC (gcli) + significance kernels, one launch per band,
  *    spanning the band's FULL height (all precincts of the frame at once).
@@ -1637,14 +1691,20 @@ __global__ void k_pack_precinct_frame(const SvtCudaFrameBandGeom* bands, uint32_
 
 static int efc_graph1_needs_recapture(const SvtCudaFrameContext* ctx, const void* const in_planes[],
                                       const uint32_t in_stride[], uint32_t decom_h, uint32_t decom_v,
-                                      uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq, uint8_t coding_significance) {
+                                      uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq, uint8_t coding_significance,
+                                      uint8_t is_packed_input) {
     if (!ctx->graph1_captured)
         return 1;
     if (ctx->cap_decom_h != decom_h || ctx->cap_decom_v != decom_v || ctx->cap_input_bit_depth != input_bit_depth ||
-        ctx->cap_hdr_Bw != hdr_Bw || ctx->cap_hdr_Fq != hdr_Fq || ctx->cap_coding_significance != coding_significance) {
+        ctx->cap_hdr_Bw != hdr_Bw || ctx->cap_hdr_Fq != hdr_Fq || ctx->cap_coding_significance != coding_significance ||
+        ctx->cap_is_packed_input != is_packed_input) {
         return 1;
     }
-    for (uint32_t c = 0; c < ctx->comps_num; c++) {
+    /* Packed mode only ever uses slot 0 (see svt_cuda_encode_frame()'s
+     * is_packed_input contract) -- comparing the other slots would compare
+     * stale/unused values left over from a previous planar-mode capture. */
+    uint32_t comps_to_check = is_packed_input ? 1 : ctx->comps_num;
+    for (uint32_t c = 0; c < comps_to_check; c++) {
         if (ctx->cap_in_planes[c] != in_planes[c] || ctx->cap_in_stride[c] != in_stride[c]) {
             return 1;
         }
@@ -1662,7 +1722,8 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
                           uint32_t decom_h, uint32_t decom_v, uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq,
                           uint8_t quant_type, uint8_t use_short_header, uint8_t coding_significance, uint8_t coding_raw_enable,
                           uint32_t max_quantization, uint32_t max_refinement, const uint32_t* precinct_budget_bytes,
-                          uint32_t bands_num_exists, uint32_t packets_exist_num, uint8_t* out_buffer, uint32_t* out_used_bytes) {
+                          uint32_t bands_num_exists, uint32_t packets_exist_num, uint8_t is_packed_input, uint8_t* out_buffer,
+                          uint32_t* out_used_bytes) {
     uint32_t bands_num_all = ctx->bands_num_all;
     uint32_t precincts_num = ctx->precincts_num;
     uint32_t packets_num = ctx->packets_num;
@@ -1694,8 +1755,13 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
      * abandoned: elapsed-time queries on events recorded via
      * cudaGraphLaunch replay returned cudaErrorInvalidValue on this
      * driver/toolkit combination for reasons not further investigated. */
-    if (efc_prof && efc_graph1_needs_recapture(ctx, in_planes, in_stride, decom_h, decom_v, input_bit_depth, hdr_Bw,
-                                               hdr_Fq, coding_significance)) {
+    /* Packed-input sub-phase diagnostics are out of scope for this
+     * (SVT_CUDA_PROFILE=1-only, off by default) block -- see
+     * PortingStrategy.txt "channel-interleaved input" section; the real
+     * graph1 capture right below fully supports packed input regardless. */
+    if (efc_prof && !is_packed_input &&
+        efc_graph1_needs_recapture(
+            ctx, in_planes, in_stride, decom_h, decom_v, input_bit_depth, hdr_Bw, hdr_Fq, coding_significance, is_packed_input)) {
         cudaGraph_t diag_g = NULL;
         cudaGraphExec_t diag_exec = NULL;
         EfcProfileTimer diag_timer;
@@ -1777,7 +1843,7 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
      * bands) + batched RC LUT build (all bands) + D2H copy of the LUT into
      * ctx->h_lut. Captured once, replayed on every call after that. --- */
     if (efc_graph1_needs_recapture(ctx, in_planes, in_stride, decom_h, decom_v, input_bit_depth, hdr_Bw, hdr_Fq,
-                                   coding_significance)) {
+                                   coding_significance, is_packed_input)) {
         if (ctx->graph1_exec) {
             cudaGraphExecDestroy(ctx->graph1_exec);
             ctx->graph1_exec = NULL;
@@ -1792,8 +1858,13 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
         }
 
         int dwt_err = 0;
-        for (uint32_t c = 0; c < ctx->comps_num; c++) {
-            dwt_err = efc_run_dwt(ctx, c, in_planes[c], in_stride[c], decom_h, decom_v, input_bit_depth, hdr_Bw, hdr_Fq);
+        if (is_packed_input) {
+            dwt_err = efc_run_deinterleave_packed(ctx, in_planes[0], in_stride[0], input_bit_depth);
+        }
+        for (uint32_t c = 0; dwt_err == 0 && c < ctx->comps_num; c++) {
+            dwt_err = is_packed_input
+                ? efc_run_dwt_prefilled(ctx, c, decom_h, decom_v, input_bit_depth, hdr_Bw, hdr_Fq)
+                : efc_run_dwt(ctx, c, in_planes[c], in_stride[c], decom_h, decom_v, input_bit_depth, hdr_Bw, hdr_Fq);
             if (dwt_err != 0) {
                 break;
             }
@@ -1857,7 +1928,9 @@ int svt_cuda_encode_frame(SvtCudaFrameContext* ctx, const void* const in_planes[
         ctx->cap_hdr_Bw = hdr_Bw;
         ctx->cap_hdr_Fq = hdr_Fq;
         ctx->cap_coding_significance = coding_significance;
-        for (uint32_t c = 0; c < ctx->comps_num; c++) {
+        ctx->cap_is_packed_input = is_packed_input;
+        uint32_t comps_captured = is_packed_input ? 1 : ctx->comps_num;
+        for (uint32_t c = 0; c < comps_captured; c++) {
             ctx->cap_in_planes[c] = in_planes[c];
             ctx->cap_in_stride[c] = in_stride[c];
         }

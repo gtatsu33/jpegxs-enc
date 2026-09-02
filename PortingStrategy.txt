@@ -2128,3 +2128,327 @@ Phaseごとの実装手順の詳細は上記の計画ファイル側を参照す
   別の一時グラフで計測する」設計を維持しないと、warm時間自体に計測
   オーバーヘッドが乗ってしまう点に注意が必要(将来の拡張課題として
   記録するのみで、本セッションでは対応しない)。
+
+**[2026-09-02 追記: チャンネルインターリーブ(packed)入力対応 検討中(実装前)]**
+
+ユーザー要望: 現在のサンプルアプリ(main.c)は、チャンネルインターリーブ画像
+(PPMのRGBRGB...)の場合、`deinterleave_rgb()`というCUDA外のCコードで
+事前にプレーナ化してからCPU版・CUDA版どちらのエンコード処理にも渡している。
+これを「フレームエンコード関数の中」で行うように書き換える。C版(CPU)は
+Cコードで、CUDA版はCUDAコードで、それぞれデインターリーブを行う。CUDA側の
+フレームエンコード関数(`svt_cuda_encode_frame()`)はインターリーブ入力も
+受け取れるように拡張する必要がある。
+
+調査結果:
+
+1. **CPU版は実はライブラリ本体が既にpacked入力をネイティブサポートしている**。
+   `COLOUR_FORMAT_PACKED_YUV444_OR_RGB`という既存のColourFormat_t値があり
+   (`SvtJpegxs.h:60`)、実際の per-line デインターリーブは
+   `GcStageProcess.c`の`convert_packed_to_planar_rgb_8bit_c`/
+   `_16bit_c`(395-424行目、C実装。ASM版もAVX2/AVX512に存在)が、
+   本番のDWT直前ステージ(`set_packed_input_pointers_precalc/_calc`,
+   660-701行目)内で行毎に呼ばれている。つまりCPU版は**既にフレーム
+   エンコード処理の内部(Cコード)でデインターリーブしている**——
+   main.cが使っていないだけ。
+   - 唯一の制約: `EncHandle.c:337-343`により、`COLOUR_FORMAT_PACKED_YUV444_OR_RGB`は
+     `cpu_profile == CPU_PROFILE_LOW_LATENCY`でなければエラーになる
+     (`CPU_PROFILE_CPU`threading modelでは未実装のTODOのまま)。
+     デフォルトの`cpu_profile`は0=`CPU_PROFILE_CPU`(`EncHandle.c:539`)
+     なので、main.cで明示的に`enc.cpu_profile = CPU_PROFILE_LOW_LATENCY;`
+     を設定する必要がある。
+   - `ImageBuffer.c:46-67`により、packed用の`svt_jpeg_xs_image_buffer_t`は
+     `data_yuv[0]`1枚だけを使い、stride = width*3*pixel_sizeのRGBRGB...
+     連続バッファとして確保される。PPMの16bitサンプルは読み込み時点で
+     既にnative順(このマシンはLE)に変換済み(既存の`deinterleave_rgb()`が
+     `uint16_t*`として直接読んでいる箇所と同じ前提)なので、PPMバッファを
+     そのまま(バイト単位memcpyのみ、要素の並べ替え無し)`data_yuv[0]`に
+     コピーするだけで良い。
+   - **結論(CPU)**: main.cを`colour_format = COLOUR_FORMAT_PACKED_YUV444_OR_RGB`
+     + `cpu_profile = CPU_PROFILE_LOW_LATENCY`に切り替え、`deinterleave_rgb()`
+     呼び出しを削除してPPMバッファをそのまま渡すだけで完了。**ライブラリ本体
+     (Encoder/Codec配下)のコード変更は不要**。
+
+2. **CUDA版(`svt_cuda_encode_frame()`)はpacked入力の受け口が存在しない**。
+   現在の入力経路(`EncodeFrameCuda.cu`の`efc_run_dwt()` →
+   `DwtCuda.cu`の`svt_cuda_dwt_component_ctx()`, 625-649行目)は、
+   コンポーネント毎に呼ばれ、**ホスト側のプレーナポインタ`in_plane`を
+   `cudaMemcpy2DAsync`で直接デバイスの`d_in_raw`スクラッチへH2D転送**
+   している(1回のフレームで3回、コンポーネント毎に1回)。`d_in_raw`は
+   3コンポーネントで再利用される共有スクラッチ(`FrameContextCuda.cuh:57`
+   のコメント「reused sequentially across the comps_num DWT calls」)。
+   `cudaMemcpy2DAsync`は行ごとに連続バイトをコピーする仕組みのため、
+   要素間ストライドが3であるpacked入力を直接この経路に流すことはできない
+   (行内での要素抽出=デインターリーブが別途必要)。
+
+   **設計方針(提案)**:
+   - `svt_cuda_encode_frame()`のシグネチャを拡張し、"packed"モードを示す
+     引数(例: `uint8_t is_packed_input`)を追加。packedモードでは
+     `in_planes[0]`をpacked連続バッファのホストポインタ、`in_stride[0]`を
+     packed行ストライド(要素数、= comp_width * comps_num)として解釈し、
+     `in_planes[1]`以降は未使用とする(既存のplanarモードの引数はそのまま
+     互換維持、呼び出し元で分岐)。
+   - フレーム毎に1回だけ、packed全体を**単一の連続`cudaMemcpyAsync`**で
+     新規の持続デバイスバッファ`ctx->d_packed_in`へH2D転送する(むしろ
+     現状の「コンポーネント毎に3回に分けたcudaMemcpy2DAsync」より転送は
+     単純化される)。
+   - 新規CUDAカーネル`k_deinterleave_packed_to_planar_8bit`/`_16bit`を追加。
+     `GcStageProcess.c`の`convert_packed_to_planar_rgb_8bit_c`/`_16bit_c`と
+     等価なロジック(1ピクセルにつき3要素中1つを抽出)を、フレーム全体に
+     対して1コンポーネント分だけ書き出す形でバッチ実行する。
+     `efc_run_dwt()`のコンポーネントループ内で、既存の
+     「H2D(`cudaMemcpy2DAsync`) → `k_nlt_scale_*`」の**H2D部分だけを
+     このカーネル呼び出しに置き換える**(出力先は既存の`d_in_raw`と
+     全く同じレイアウト)。これにより`k_nlt_scale_8bit/16bit`・
+     垂直リフトNLTカーネル・DWT・GC・RC-LUT・pack以降は**一切変更不要**
+     (既存コードを100%再利用)。
+   - この新規カーネルは既存のgraph1キャプチャ範囲内(cudaStreamBeginCapture
+     〜EndCapture)に組み込む。永続グラフ(graph1/graph1_exec)の
+     replayモデルは変更しない——つまりwarm時のAPI呼び出し・カーネル
+     launch回数の設計自体は変わらず、記録済みのwarm計測手法
+     (本ドキュメント直前の内訳表)に影響を与えない。
+   - `efc_graph1_needs_recapture()`の再capture判定に、
+     `is_packed_input`フラグとpacked用ポインタ/ストライドの変化検知を
+     追加する(既存の`cap_in_planes[c]`/`cap_in_stride[c]`比較と同様の
+     パターンを1エントリ分追加)。
+   - `FrameContextCuda.cuh`の`SvtCudaFrameContext`に、`d_packed_in`
+     (持続デバイスバッファ、サイズ=frame全体のpacked byte数)と、
+     capture比較用の`cap_is_packed_input`/`cap_packed_stride`を追加。
+
+3. **main.c(サンプルアプリ)の変更**:
+   - `deinterleave_rgb()`を削除(呼び出し箇所も削除)。
+   - CPU側: `enc.colour_format = COLOUR_FORMAT_PACKED_YUV444_OR_RGB;` +
+     `enc.cpu_profile = CPU_PROFILE_LOW_LATENCY;`に変更し、PPMバッファを
+     そのまま(要素並べ替え無しでmemcpyのみ)`in_buf->data_yuv[0]`へコピー。
+   - CUDA側: `svt_cuda_encode_frame()`呼び出しに`is_packed_input=1`を渡し、
+     `in_planes[0]`=PPMバッファのホストポインタ、`in_stride[0]`=行あたり
+     要素数(width*3)を渡す。
+   - CPU-vs-CUDA bit-exact検証(既存の主要な自己チェック)はそのまま
+     維持できる想定(どちらも同じ元データを最終的に同じ数値へ変換する
+     だけで、精度に影響する変換は無い)。
+   - yuv422p8パス(既に`copy_yuv422p8_planes()`でプレーナのままmemcpy)は
+     今回のインターリーブ対応と無関係のため変更不要。
+
+4. **検証方法(実装後)**:
+   - CUDAビルドを再構成・再ビルドし、`*Cuda*`テスト35/35 pass・全回帰
+     スイート(既存の12000件規模)に回帰が無いことを確認。
+   - `tests/UnitTests/TestEncodeFrameCuda.cc`にpacked入力用の新規テスト
+     ケース(既存のplanarケースと同じ手法で、`is_packed_input=1`を渡す
+     バリエーション)を追加し、CPU側(`GcStageProcess.c`のリファレンス
+     関数、あるいは既存の`deinterleave_rgb`相当の単純な期待値計算)との
+     bit-exact一致を確認。
+   - `SvtJpegxsSampleEncoderCuda.exe`でchart_color/eval_fantom1
+     (RGB/444系testdata)を再エンコードし、CPU版・CUDA版が引き続き
+     bit-exactであることと、ISO参照デコーダでの復号成功(既存TODO Eの
+     確認と同水準)を再確認。
+   - 処理時間(warm)が既存の内訳表の数値から大きく変化しないこと
+     (新規デインターリーブカーネルが持続グラフ内に収まっている限り、
+     追加コストはカーネル実行時間そのものだけで、API呼び出しオーバー
+     ヘッドは増えない見込み)を確認する。
+
+5. **変更対象ファイル(見込み)**:
+   - `SVT-JPEG-XS/Source/App/SampleEncoderCuda/main.c`
+     (`deinterleave_rgb()`削除、CPU側colour_format/cpu_profile変更、
+     CUDA側呼び出しにpacked引数追加)
+   - `SVT-JPEG-XS/Source/Lib/Encoder/CUDA/EncodeFrameCuda.cuh`
+     (`svt_cuda_encode_frame()`シグネチャ拡張)
+   - `SVT-JPEG-XS/Source/Lib/Encoder/CUDA/EncodeFrameCuda.cu`
+     (`efc_run_dwt()`呼び出し部分の分岐、`efc_graph1_needs_recapture()`拡張)
+   - `SVT-JPEG-XS/Source/Lib/Encoder/CUDA/DwtCuda.cuh`/`.cu`
+     (新規デインターリーブカーネル追加、または`svt_cuda_dwt_component_ctx()`
+     に packed対応バリアントを追加)
+   - `SVT-JPEG-XS/Source/Lib/Encoder/CUDA/FrameContextCuda.cuh`
+     (`d_packed_in`等のフィールド追加、確保/解放処理)
+   - `SVT-JPEG-XS/tests/UnitTests/TestEncodeFrameCuda.cc`(新規テスト追加)
+   - ライブラリ本体(`Source/Lib/Encoder/Codec`配下)の変更は**不要**
+     (CPU側は既存のpacked対応をmain.cから使うだけ)。
+
+**[2026-09-02 追記: CUDA側デインターリーブの実測プロトタイプ検証]**
+
+上記セクション2(CUDA側設計)を実装前に検証するため、`EncodeFrameCuda.cu`/
+`DwtCuda.cu`本体には触れず、スクラッチ領域(git未追跡)に独立したCUDA
+プロトタイプ(`bench_deinterleave_cuda.cu`)を作成し、1920x1080の8bit/16bit
+RGBで実測した。
+
+**重要な検証ミスを検出・修正**: 最初のビルドでは`nvcc`を既定の
+アーキテクチャ指定のままコンパイルしたため、このマシンのRTX 5070 Ti
+(Blackwell, compute capability 12.0)向けのPTXが生成されず、カーネルが
+`the provided PTX was compiled with an unsupported toolchain`エラーで
+**実際には一度も実行されずに無視**されていた。この状態での計測値
+(0.0001ms台)は完全に無意味だったが、正しさ検証(correctness check、
+既知パターンをpacked→planar変換した結果をホストへ読み戻して比較)を
+必ず行う運用にしていたため、この誤りが発覚した。`-arch=sm_120`を明示して
+再ビルドし、correctness checkがPASSすることを確認した上で、以下の実測値
+を得た。
+
+  | 項目 | 実測値(8bit) |
+  |---|---|
+  | [A] 3回に分けたコンポーネント毎カーネル | 0.0233 ms |
+  | [B] 1回で3チャンネル同時書き出し(fused) | 0.0108〜0.0116 ms |
+  | H2D単体(6.22MB連続転送) | 0.1248 ms |
+  | H2D+fusedカーネルを1つのグラフに結合 | 0.343〜0.352 ms |
+  | H2D+3回カーネルを1つのグラフに結合 | 0.354〜0.366 ms |
+
+fused版(1パスで3チャンネル同時書き出し)が3回に分けた版より約2倍速い
+ことを確認——これは、3回に分けるとpackedバッファ全体を3回読み直す
+(冗長な読み込み)という、設計段階で指摘していた懸念が実測でも裏付けられた
+結果。したがって統合時はfused版(1コンポーネントループではなく、1回の
+カーネル呼び出しで3コンポーネント全てをd_in_raw相当の3バッファへ同時に
+書き出す設計)を採用する。
+
+**想定外だった点**: H2D単体(0.125ms)とカーネル単体(0.011ms)を個別に
+計測した合計(約0.136ms)に対し、同じ2つの処理を**1つのグラフに結合して
+計測すると0.34〜0.35msと、単純合計の2.5倍以上になる**(3回再実行して再現性
+あり、安定)。おそらくWindows WDDMドライバモデル特有の、DMA完了→カーネル
+起動間のディスパッチ/同期オーバーヘッドによるものと推測するが、根本原因は
+未解明。この数値は本番のgraph1(既存のNLT+DWT+GC+RC-LUT等を含む、遥かに
+大きなグラフ)に同じH2D→カーネル遷移を組み込んだ場合にも同様に現れるか、
+実装後に確認が必要。
+
+**結論(CPU側隠れコストとの比較)**: 前回実測したCPU側の隠れコスト
+(`deinterleave_rgb()`相当、1920x1080 8bit RGBで1.4867ms、単一スレッド
+scalar C)と比較すると、CUDA側の追加コスト(実測0.35ms程度)はその
+約4分の1であり、「実質のエンドツーエンド速度は向上する」という結論は
+変わらない。ただし前回の見積もり(1ms未満)よりは大きい値であり、
+内訳(単純なカーネル実行コストではなく、H2D→カーネル遷移コストが主要因)
+も予想と異なっていた。
+
+**[2026-09-02 追記: graph1統合方針の決定]**
+
+ユーザーからの確認: 「デインターリーブをgraph1の前処理として別グラフで
+行った場合も、graph1側に影響があるか」という問いに対し、以下を回答・
+決定した。
+
+- graph1は現在、`svt_cuda_dwt_component_ctx()`(`DwtCuda.cu:640`)内で
+  「ホストのプレーナポインタから`d_in_raw`へのH2D転送」を自身のcapture
+  範囲の最初のステップとして内包している。デインターリーブ結果を
+  **デバイス上に直接置いて(round-trip無しで)graph1に渡す**限り、
+  graph1が持つこの既存H2Dステップは、packed入力の場合には不要かつ
+  データを上書きしてしまうため**必ず置き換える必要がある**。これは
+  デインターリーブのコードを「graph1と同じcapture範囲に含める」か
+  「別グラフとして前段に置く」かに関わらず、論理的に避けられない変更。
+- 代替として、デインターリーブ結果を一度ホストへD2Hで書き戻し、既存の
+  `svt_cuda_encode_frame()`(graph1含め一切変更無し)にそのまま渡す
+  という構成も可能だが、追加のD2H転送コスト(実測要、推定0.1〜0.15ms)が
+  乗り、既存のgraph1のH2Dコストもそのまま残るため、性能面では不利。
+- **決定**: 性能を優先し、graph1のH2Dステップをpacked用デインターリーブ
+  ステップに置き換える方針(round-trip無し)を採用する。
+
+**[2026-09-02 追記: 実装完了]**
+
+上記方針(graph1のH2Dステップをpacked用デインターリーブに置き換え、
+round-trip無し)で実装した。
+
+**変更内容**:
+- `DwtCuda.cu`/`.cuh`: `svt_cuda_dwt_component_ctx()`の共通処理部分を
+  `dwt_component_ctx_body()`として分離し、既存のH2D版と新規の
+  `svt_cuda_dwt_component_ctx_prefilled()`(d_in_rawが既に埋まっている
+  前提でH2Dをスキップする版)の両方から呼ぶ構成にした(コード重複を
+  避けるため)。新規カーネル`k_deinterleave_packed_to_planar_8bit`/
+  `_16bit`(1回のパスで3チャンネル同時書き出し、プロトタイプ検証で
+  確認した"fused"版)と、それを呼ぶ`svt_cuda_deinterleave_packed_rgb()`
+  を追加。
+- `FrameContextCuda.cuh`/`.cu`: `d_packed_in`(packed全体のH2D転送先、
+  持続バッファ)と`d_in_raw_planes[FCC_MAX_COMPONENTS]`(コンポーネント毎の
+  デインターリーブ結果、fusedカーネルが3つ同時に書くため`d_in_raw`とは
+  別に3本必要)を追加。`cap_is_packed_input`をrecapture判定に追加。
+- `EncodeFrameCuda.cu`/`.cuh`: `svt_cuda_encode_frame()`に
+  `is_packed_input`引数を追加(packed時は`in_planes[0]`/`in_stride[0]`の
+  みを使用)。`efc_run_deinterleave_packed()`(フレーム毎に1回、packed全体
+  のH2D+fusedデインターリーブ)と`efc_run_dwt_prefilled()`(コンポーネント
+  毎、既存のDWTパイプラインへの薄いラッパー)を追加し、graph1のcapture
+  範囲内でpacked時はH2Dステップをこれらに置き換えた。SVT_CUDA_PROFILE診断
+  サブ計測はpacked入力時はスキップ(スコープ外、オフが既定のため実害無し)。
+- `SampleEncoderCuda/main.c`: `deinterleave_rgb()`を削除し、
+  `copy_packed_rgb_plane()`(単純memcpy)に置き換え。CPU側は
+  `colour_format = COLOUR_FORMAT_PACKED_YUV444_OR_RGB`
+  + `cpu_profile = CPU_PROFILE_LOW_LATENCY`(実は既定値のCPU_PROFILE_LOW_LATENCY=0
+  のままで動作可能だったことが判明したが、意図を明示するため明示的に設定)
+  に変更。CUDA側は`is_packed_input`を渡すよう変更。
+- 全ての既存呼び出し元(`tests/Benchmark/main.cpp`、
+  `tests/UnitTests/Test{EncodeFrameCuda,BisectSmall444Cuda,
+  BisectRealCrop444Cuda,BisectRcLutRealCuda}Cuda.cc`)は
+  `is_packed_input=0`を渡すよう更新(既存の動作は変更無し)。
+
+**検証結果**:
+- `*Cuda*`テスト35/35 pass。
+- 全回帰スイート12074/12076 pass(既存の2件の無関係skipのみ、前回と同一)、
+  回帰無し確認。
+- 3つのtestdataファイル(chart_color/eval_fantom1/yuv422p8)全てCPU-CUDA
+  bit-exact一致、ISO参照デコーダでの復号成功(exit:0)を確認——RGB系2ファイル
+  は新しいpackedパスを通り、yuv422p8は既存のプレーナパス(変更無し)を通る
+  ため、regression無しであることも確認できた。
+- warm時間は測定誤差(±1〜2ms、ミリ秒粒度タイマー)の範囲内で前回の
+  ベースラインと同等(chart_color 9〜11ms、eval_fantom1 11ms、いずれも
+  前回記録の9〜10ms台と有意差無し)。プロトタイプで実測した約0.35msの
+  追加コストはタイマー粒度以下で、測定上は検出できないというのが
+  実際の結果だった。
+
+これでTODO(チャンネルインターリーブ入力のCUDA内デインターリーブ対応)は
+完了。
+
+**[2026-09-02 追記: warm時間の単発値についてのユーザー指摘・検証]**
+
+上記「chart_color 9〜10ms、eval_fantom1 11ms」という単発計測結果に対し、
+ユーザーから「デインターリーブ処理自体は画像内容に依存しない固定コスト
+のはずなのに、なぜ同じ解像度・bit depthの2ファイル間で2msも差が出るのか」
+という指摘を受けた。単発のミリ秒精度計測(`get_current_time()`、
+`_ftime_s`)を鵜呑みにせず、同一バイナリで両ファイルを10回連続計測して
+検証した結果:
+
+- chart_color CUDA warm: 10,9,10,10,9,10,9,10,10,10 → 平均9.7ms
+- eval_fantom1 CUDA warm: 9,10,10,10,9,10,10,10,9,10 → 平均9.7ms
+
+**平均は完全に一致**。以前報告した「eval_fantom1=11ms」は、±1msでばらつく
+分布の高い側をたまたま引いた単発サンプルであり、実体のある差ではなく
+ミリ秒精度タイマーの量子化ノイズだったことを確認した。旧CUDA warm(以前
+記録の単発値、10.000ms/9.000ms)も同じ精度の単発計測であり、今回の平均値
+(いずれも9.7ms)との差は測定誤差の範囲内。
+
+参考までにCPU側・yuv422p8側も10回計測した:
+- chart_color CPU: 平均65.6ms(範囲65〜70)
+- eval_fantom1 CPU: 平均70.1ms(範囲68〜74、CUDAと違いこちらは~4.5msの
+  差があるが、CPU側はRC二分探索の反復回数など画像内容に依存する処理を
+  含むため、これ自体は妥当な差と考えられる)
+- yuv422p8 CUDA warm: 平均2.7ms(範囲2〜3)
+- yuv422p8 CPU: 平均15.5ms(範囲15〜19、外れ値1回含む)
+
+**結論**: 「CUDA内デインターリーブ対応の前後でwarm時間はほぼ変化しない
+(平均9.7ms、量子化ノイズの範囲内)」という結論は変わらない。一方、
+「旧CUDA warm + 単独デインターリーブ」という前回測定相当の再構成値
+(約14〜15ms)と今回の実測平均(9.7ms)との差は、量子化ノイズよりずっと
+大きいため、この比較(GPU内デインターリーブがCPU側の丸ごとの処理時間を
+置き換えたのではなく、既存の永続グラフ内への小さな追加で済んでいる)は
+引き続き有効な結論である。単発サンプルではなく複数回計測・平均を取る
+ことの重要性を再確認した一件として記録する。
+
+`encoding_speed_comparison.html`も同様に修正済み(単発値ではなく10回平均
+/範囲を表示、量子化ノイズについての注記を追加)。
+
+**[2026-09-02 追記: TODO H — CPU版マルチスレッド化によるGPU版との速度比較]**
+
+ユーザーからの質問: 「CPU版の並列度を上げるとどのくらい速くなるか、
+頑張るとGPU(RTX 5070 Ti)より速くなり得るか」。このマシンのCPU
+(Intel Core Ultra 7 265K, 20コア: P-core 8 + E-core 12, 3.90GHz)を前提に、
+未実測ながら以下の見立てを回答した:
+
+- 現状`enc.threads_num = 1`固定(CPU-vs-CUDA比較の基準を揃えるための
+  意図的設定、main.cのコメント参照)。単一スレッドでのCPU時間は
+  chart_color 65.6ms/eval_fantom1 70.1ms(2026-09-02実測平均)。
+- `CPU_PROFILE_LOW_LATENCY`はスライス単位(4Kでslice_height=16 →
+  135スライス/フレーム)で並列化できる設計のため、理論上はコア数に応じて
+  スケールする余地がある。単純な線形計算では 65ms/20 ≈ 3.3ms とGPUの
+  9.7msを下回るが、RC処理の逐次性・メモリ帯域共有・スライス間同期
+  オーバーヘッド・E-coreのシングルスレッド性能の低さ等でAmdahlの法則的な
+  頭打ちが生じるため、現実的には8〜12倍程度(CPU側5〜8ms前後)が良い
+  ところだろうという未実測の見立てに留まる。「同じ桁数で競える可能性は
+  あるが確実に勝つとは言えない」という回答をした。
+- 逆にGPU版もCPU性能から完全に独立ではない: graph1/graph2間の
+  「host RC二分探索」がCPU側(単一スレッド)で実行されており、
+  8月29日の内訳ではwarm時間9.7msのうち約1.2〜1.4ms(1〜1.5割)を占める。
+  precinct(4Kで135個)毎に独立な処理なので、これを並列化すればGPU版
+  全体もわずかに短縮できる可能性がある(既存のTODO Bと同じ項目)。
+
+**TODO H(未着手、次回以降の検討課題として記録)**: `enc.threads_num`を
+上げてCPU_PROFILE_LOW_LATENCYの実際のスケーリングを実測し、上記の
+理論見積もり(8〜12倍)が妥当か検証する。合わせて、GPU版のhost RC
+二分探索(TODO Bと統合可能)をマルチスレッド化した場合の効果も実測する。

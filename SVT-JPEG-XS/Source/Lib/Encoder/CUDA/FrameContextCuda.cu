@@ -23,6 +23,10 @@ static void fcc_free_all(SvtCudaFrameContext* ctx) {
     }
 
     cudaFree(ctx->d_in_raw);
+    cudaFree(ctx->d_packed_in);
+    for (int c = 0; c < FCC_MAX_COMPONENTS; c++) {
+        cudaFree(ctx->d_in_raw_planes[c]);
+    }
     cudaFree(ctx->d_cur);
     cudaFree(ctx->d_other);
     cudaFree(ctx->d_vert);
@@ -137,6 +141,19 @@ int svt_cuda_frame_context_create(SvtCudaFrameContext* ctx, uint32_t comps_num, 
             break;
 
         if ((err = cudaMalloc(&ctx->d_in_raw, max_elems * sizeof(uint16_t))) != cudaSuccess)
+            break;
+        /* Packed-input support: sized for the worst case (comps_num
+         * interleaved components, 16-bit samples) regardless of whether this
+         * context ever actually receives packed input -- comps_num is small
+         * (<=4) so the extra footprint is negligible next to d_pyramid16[]. */
+        if ((err = cudaMalloc(&ctx->d_packed_in, (size_t)comps_num * max_elems * sizeof(uint16_t))) != cudaSuccess)
+            break;
+        for (uint32_t c = 0; c < comps_num; c++) {
+            size_t elems_c = (size_t)comp_width[c] * comp_height[c];
+            if ((err = cudaMalloc(&ctx->d_in_raw_planes[c], elems_c * sizeof(uint16_t))) != cudaSuccess)
+                break;
+        }
+        if (err != cudaSuccess)
             break;
         if ((err = cudaMalloc(&ctx->d_cur, max_elems * sizeof(int32_t))) != cudaSuccess)
             break;

@@ -73,6 +73,25 @@ int svt_cuda_dwt_component_ctx(const void* in_plane, uint32_t plane_stride, uint
                                uint8_t* d_in_raw, int32_t* d_cur, int32_t* d_other, int32_t* d_vert, int32_t* d_pyramid32,
                                uint16_t* d_out_pyramid16, cudaStream_t stream);
 
+/* Same as svt_cuda_dwt_component_ctx(), except d_in_raw is assumed already
+ * filled (pitch == comp_width) by the caller -- e.g. via
+ * svt_cuda_deinterleave_packed_rgb() below -- so no H2D copy is issued here.
+ * See PortingStrategy.txt "channel-interleaved input" section. */
+int svt_cuda_dwt_component_ctx_prefilled(uint32_t comp_width, uint32_t comp_height, uint32_t decom_h, uint32_t decom_v,
+                                         uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq, uint8_t* d_in_raw,
+                                         int32_t* d_cur, int32_t* d_other, int32_t* d_vert, int32_t* d_pyramid32,
+                                         uint16_t* d_out_pyramid16, cudaStream_t stream);
+
+/* Deinterleaves one frame's worth of packed(AoS) RGB/444 samples
+ * (d_packed, n = comp_width*comp_height pixels, 3 interleaved samples/pixel)
+ * into 3 separate planar(SoA) device buffers in a single pass. d_out0/1/2
+ * must each hold n samples (uint8_t or uint16_t per input_bit_depth,
+ * matching d_in_raw's element type elsewhere in this file). Enqueued on
+ * `stream`; returns 0 on success (kernel enqueued), non-zero CUDA error code
+ * if the enqueue itself fails synchronously. */
+int svt_cuda_deinterleave_packed_rgb(const void* d_packed, uint8_t* d_out0, uint8_t* d_out1, uint8_t* d_out2, uint32_t n,
+                                     uint8_t input_bit_depth, cudaStream_t stream);
+
 #ifdef __cplusplus
 }
 #endif

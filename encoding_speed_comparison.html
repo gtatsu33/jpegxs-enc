@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>エンコード処理時間比較(チャンネルインターリーブ対応前後)</title>
+<style>
+    body {
+        font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif;
+        margin: 40px;
+        color: #1a1a1a;
+        background: #fafafa;
+    }
+    h1 {
+        font-size: 1.4em;
+        border-bottom: 2px solid #333;
+        padding-bottom: 8px;
+    }
+    .meta {
+        color: #555;
+        font-size: 0.9em;
+        margin-bottom: 24px;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 32px;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    caption {
+        text-align: left;
+        font-weight: bold;
+        margin-bottom: 8px;
+        font-size: 1.05em;
+    }
+    th, td {
+        border: 1px solid #ccc;
+        padding: 8px 12px;
+        text-align: right;
+        white-space: nowrap;
+    }
+    th {
+        background: #2f5d8a;
+        color: #fff;
+        text-align: center;
+        font-weight: 600;
+    }
+    td:first-child, th:first-child {
+        text-align: left;
+        font-weight: 600;
+        background: #eef3f8;
+    }
+    tr:nth-child(even) td:not(:first-child) {
+        background: #f5f8fb;
+    }
+    .highlight {
+        background: #fff3cd !important;
+        font-weight: 600;
+    }
+    .note {
+        font-size: 0.9em;
+        color: #444;
+        background: #fff;
+        border-left: 4px solid #2f5d8a;
+        padding: 10px 16px;
+        margin-bottom: 28px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .note ul {
+        margin: 8px 0 0 0;
+        padding-left: 20px;
+    }
+    .section-title {
+        margin-top: 36px;
+        font-size: 1.1em;
+        color: #2f5d8a;
+    }
+    h2 {
+        margin-top: 48px;
+        font-size: 1.25em;
+        color: #1a1a1a;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 6px;
+    }
+    .version-tag {
+        display: inline-block;
+        font-size: 0.75em;
+        font-weight: 600;
+        color: #fff;
+        background: #666;
+        border-radius: 3px;
+        padding: 2px 8px;
+        margin-left: 10px;
+        vertical-align: middle;
+    }
+    .indent-1 {
+        padding-left: 1.5em;
+    }
+</style>
+</head>
+<body>
+
+<h1>SVT-JPEG-XS CUDA版 エンコード処理時間比較</h1>
+<div class="meta">
+    チャンネルインターリーブ(packed RGB)入力のCUDA内デインターリーブ対応の実装前後で行った、
+    testdata 3ファイルに対する実測記録。8月29日版(実装前、フェーズ別内訳込み)→9月2日版(実装後)の順に掲載。
+</div>
+
+<h2>8月29日版<span class="version-tag">2026-08-29</span></h2>
+<div class="meta">
+    チャンネルインターリーブ対応(CUDA内デインターリーブ)の実装より前、CPU側で事前にデインターリーブして
+    から両パスに渡していた時点での記録。<code>SVT_CUDA_PROFILE=1</code>による診断計測(本番のgraph1/graph2とは
+    別の一時的なCUDA Graphで計測するため、本番のwarm実行時間そのものには影響しない設計)で、各フェーズの
+    処理時間を取得したもの。診断計測ON/OFFでwarm時間(10ms/9ms/3ms)が変化しないことも実測で確認済み
+    (計測がcold時間[12→25ms/12→22ms/5→7ms]のみを押し上げ、warm時間には影響しない)。
+</div>
+
+<table>
+    <caption>フェーズ別処理時間の内訳(2026-08-29時点)</caption>
+    <thead>
+        <tr>
+            <th>フェーズ</th>
+            <th>chart_color<br>(4K 444)</th>
+            <th>eval_fantom1<br>(4K 444)</th>
+            <th>yuv422p8<br>(1080p 422)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>graph1合計(NLT+DWT+GC+RC-LUT)</td>
+            <td>7.015 ms</td><td>6.700 ms</td><td>1.563 ms</td>
+        </tr>
+        <tr>
+            <td class="indent-1">├ NLT+DWT(cold時参考値)</td>
+            <td>5.930 ms</td><td>5.839 ms</td><td>1.069 ms</td>
+        </tr>
+        <tr>
+            <td class="indent-1">├ GC+sig+RC-LUT+D2H(cold時参考値)</td>
+            <td>1.376 ms</td><td>1.280 ms</td><td>0.643 ms</td>
+        </tr>
+        <tr>
+            <td>host RC二分探索(CPU側、graph間)</td>
+            <td>1.369 ms</td><td>1.216 ms</td><td>0.851 ms</td>
+        </tr>
+        <tr>
+            <td>graph2合計(quantize+pack)</td>
+            <td>1.821 ms</td><td>1.825 ms</td><td>0.396 ms</td>
+        </tr>
+        <tr>
+            <td class="indent-1">├ H2D+quantize(cold時参考値)</td>
+            <td>1.025 ms</td><td>1.047 ms</td><td>0.194 ms</td>
+        </tr>
+        <tr>
+            <td class="indent-1">├ quantize only(cold時参考値)</td>
+            <td>0.837 ms</td><td>0.838 ms</td><td>0.074 ms</td>
+        </tr>
+        <tr>
+            <td class="indent-1">├ pack(cold時参考値)</td>
+            <td>0.483 ms</td><td>0.275 ms</td><td>0.085 ms</td>
+        </tr>
+        <tr>
+            <td>合計(graph1+RC+graph2)</td>
+            <td>10.21 ms</td><td>9.74 ms</td><td>2.81 ms</td>
+        </tr>
+        <tr class="highlight">
+            <td class="highlight">報告されているwarm時間(2回目呼び出し)</td>
+            <td class="highlight">10.000 ms</td><td class="highlight">9.000 ms</td><td class="highlight">3.000 ms</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="note">
+    <strong>注記</strong>
+    <ul>
+        <li>「cold時参考値」の行(NLT+DWT/GC等/H2D+quantize/quantize only/pack)は、診断計測の設計上<strong>初回(cold)呼び出し時にのみ</strong>測定される値(既存の<code>efc_graph2_needs_recapture()</code>等によるゲート、再計測は稀なrecaptureタイミングのみ)。</li>
+        <li>graph1合計・host RC・graph2合計・報告されているwarm時間の行は毎回(warm含む)出力される値であり、これはwarm実測値そのもの。</li>
+        <li>この時点では、チャンネルインターリーブ(packed RGB)入力のデインターリーブはCUDA外のCコードで事前に行われており、その処理時間はここでの計測区間(svt_cuda_encode_frame()呼び出し内)には含まれていない。</li>
+    </ul>
+</div>
+
+<h2>9月2日版<span class="version-tag">2026-09-02</span></h2>
+<div class="meta">
+    チャンネルインターリーブ入力のデインターリーブをCUDA内(graph1に組み込んだ専用カーネル)で行うよう
+    実装した後の記録。CPU版も同時に、ライブラリ本体がネイティブサポートするpacked形式(<code>COLOUR_FORMAT_PACKED_YUV444_OR_RGB</code>)
+    を使うよう変更し、CUDA外での事前デインターリーブを完全に廃止した。
+</div>
+
+<table>
+    <caption>3ファイルの処理時間一覧(2026-09-02時点、各10回実行の平均値/範囲)</caption>
+    <thead>
+        <tr>
+            <th>ファイル</th>
+            <th>CPU版<br>(デインターリーブ込み、平均/範囲)</th>
+            <th class="highlight">CUDA warm<br>(今回実測、デインターリーブ込み、平均/範囲)</th>
+            <th>旧CUDA warm<br>(デインターリーブ抜き、以前記録、単発値)</th>
+            <th>単独CPUデインターリーブ<br>実測(50回平均)</th>
+            <th>旧CUDA warm + 単独デインターリーブ<br>(前回測定の実質同等値)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>chart_color<br><span style="font-weight:400; color:#666;">3840x2160, 10bit RGB</span></td>
+            <td>65.6 ms<br><span style="font-weight:400; color:#888;">(範囲 65〜70)</span></td>
+            <td class="highlight">9.7 ms<br><span style="font-weight:400; color:#888;">(範囲 9〜10)</span></td>
+            <td>10.000 ms</td>
+            <td>4.9042 ms</td>
+            <td>14.9042 ms</td>
+        </tr>
+        <tr>
+            <td>eval_fantom1<br><span style="font-weight:400; color:#666;">3840x2160, 10bit RGB</span></td>
+            <td>70.1 ms<br><span style="font-weight:400; color:#888;">(範囲 68〜74)</span></td>
+            <td class="highlight">9.7 ms<br><span style="font-weight:400; color:#888;">(範囲 9〜10)</span></td>
+            <td>9.000 ms</td>
+            <td>4.9042 ms</td>
+            <td>13.9042 ms</td>
+        </tr>
+        <tr>
+            <td>yuv422p8<br><span style="font-weight:400; color:#666;">1920x1080, 8bit YUV422</span></td>
+            <td>15.5 ms<br><span style="font-weight:400; color:#888;">(範囲 15〜19、外れ値1回含む)</span></td>
+            <td class="highlight">2.7 ms<br><span style="font-weight:400; color:#888;">(範囲 2〜3)</span></td>
+            <td>3.000 ms</td>
+            <td>&mdash;<br><span style="font-weight:400; color:#888;">(対象外、既にプレーナ)</span></td>
+            <td>3.000 ms</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="note">
+    <strong>単発値の疑問点とその検証(2026-09-02追記)</strong>
+    <p style="margin-top:0;">
+        当初、単発計測で「chart_color=10ms、eval_fantom1=11ms」という結果を報告したが、
+        <strong>デインターリーブ処理自体は画像内容に依存しない固定コストのはずなのに、なぜ2ファイル間で
+        差が出るのか</strong>という指摘を受け、同一バイナリで10回連続計測して検証した。
+    </p>
+    <ul>
+        <li>chart_color: 10,9,10,10,9,10,9,10,10,10 → 平均9.7ms</li>
+        <li>eval_fantom1: 9,10,10,10,9,10,10,10,9,10 → 平均9.7ms</li>
+        <li><strong>平均は完全に一致</strong>。以前報告した「eval_fantom1=11ms」は、±1msの範囲でばらつく分布の
+        高い側をたまたま引いた単発サンプルであり、実体のある差ではなく<code>get_current_time()</code>
+        (<code>_ftime_s</code>、1ms精度)による量子化ノイズだったことを確認した。</li>
+        <li>旧CUDA warm(以前記録の単発値、10.000ms/9.000ms)も同じ精度の単発計測であり、今回の平均値(いずれも9.7ms)との差は測定誤差の範囲内。したがって「デインターリーブ込みでもwarm時間はほぼ変化しない」という結論は変わらない。</li>
+    </ul>
+    <strong>読み取れること(結論)</strong>
+    <ul>
+        <li>RGB系2ファイル(chart_color/eval_fantom1)は、CUDA内デインターリーブ対応の前後でwarm時間がほぼ変化しない(平均9.7ms、±1ms精度の範囲内)。</li>
+        <li>「旧CUDA warm + 単独デインターリーブ」という前回測定相当の再構成値(約14〜15ms)と比べると、今回の実測(9.7ms)は明確に速い。これはGPU側のデインターリーブが、CPU側でかかる約4.9msの処理をそのまま置き換えたのではなく、既存の永続CUDAグラフ内に組み込まれた分だけ(実測プロトタイプ検証で確認した約0.35ms程度)の追加で済んでいるため——この結論はミリ秒精度の量子化ノイズよりずっと大きい差であり、影響を受けない。</li>
+        <li>yuv422p8は元からプレーナ入力でデインターリーブ自体が発生しないため、旧・新の値は同じ(3ms前後)。</li>
+    </ul>
+</div>
+
+<div class="section-title">計測条件</div>
+<div class="note">
+    <ul>
+        <li>CPU版: 単一スレッド(threads_num=1)、RC_CBR_PER_PRECINCT。</li>
+        <li>CUDA warm: 同一ctxに対する2回目のsvt_cuda_encode_frame()呼び出し(cudaGraphLaunchによるreplayのみ、グラフcapture済み)。</li>
+        <li>単独CPUデインターリーブ実測: 旧main.cのdeinterleave_rgb()と同一ロジック(スカラC、単一スレッド、/O2最適化)を該当解像度・ビット深度で50回反復平均。</li>
+        <li>全3ファイルともCPU-CUDA bit-exact一致、ISO/IEC 21122-5参照デコーダでの復号成功(exit:0)を確認済み。</li>
+    </ul>
+</div>
+
+</body>
+</html>

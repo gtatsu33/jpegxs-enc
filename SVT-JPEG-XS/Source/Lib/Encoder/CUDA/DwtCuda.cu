@@ -622,31 +622,20 @@ int svt_cuda_dwt_component(const void* in_plane, uint32_t plane_stride, uint32_t
     return err == cudaSuccess ? 0 : (int)err;
 }
 
-int svt_cuda_dwt_component_ctx(const void* in_plane, uint32_t plane_stride, uint32_t comp_width, uint32_t comp_height,
-                               uint32_t decom_h, uint32_t decom_v, uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq,
-                               uint8_t* d_in_raw, int32_t* d_cur, int32_t* d_other, int32_t* d_vert, int32_t* d_pyramid,
-                               uint16_t* d_out_pyramid16, cudaStream_t stream) {
-    if (comp_width < 2 || comp_height < 2 || decom_h < decom_v) {
-        return 1;
-    }
-
+/* Shared tail of svt_cuda_dwt_component_ctx()/svt_cuda_dwt_component_ctx_prefilled():
+ * both validate their own inputs and get raw sample data into d_in_raw (one
+ * via its own H2D copy, the other via a caller-supplied, already-filled
+ * buffer -- e.g. a packed-input deinterleave kernel, see EncodeFrameCuda.cu),
+ * then run the identical NLT-scale/vertical-lift/DWT pipeline on it. Kept as
+ * one body so the two entry points can never drift out of sync. */
+static int dwt_component_ctx_body(uint32_t plane_stride, uint32_t comp_width, uint32_t comp_height, uint32_t decom_h,
+                                  uint32_t decom_v, uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq,
+                                  uint8_t* d_in_raw, int32_t* d_cur, int32_t* d_other, int32_t* d_vert, int32_t* d_pyramid,
+                                  uint16_t* d_out_pyramid16, cudaStream_t stream) {
     /* [2026-08-28 Phase B, Step B1 -- tried, reverted] Must stay in lockstep
      * with the identical constant in svt_cuda_dwt_component() above -- see
      * that copy's comment for the full rationale and measurement record. */
     const uint32_t THREADS = 256;
-    cudaError_t err = cudaSuccess;
-
-    size_t in_elem_size = (input_bit_depth <= 8) ? sizeof(uint8_t) : sizeof(uint16_t);
-    if ((err = cudaMemcpy2DAsync(d_in_raw,
-                                 plane_stride * in_elem_size,
-                                 in_plane,
-                                 plane_stride * in_elem_size,
-                                 comp_width * in_elem_size,
-                                 comp_height,
-                                 cudaMemcpyHostToDevice,
-                                 stream)) != cudaSuccess) {
-        return (int)err;
-    }
 
     const uint8_t shift = hdr_Bw - input_bit_depth;
     const int32_t offset = 1 << (hdr_Bw - 1);
@@ -823,4 +812,88 @@ int svt_cuda_dwt_component_ctx(const void* in_plane, uint32_t plane_stride, uint
         d_cur, comp_width, active_w, active_h, d_out_pyramid16, comp_width, shift_out, offset_out);
 
     return 0;
+}
+
+int svt_cuda_dwt_component_ctx(const void* in_plane, uint32_t plane_stride, uint32_t comp_width, uint32_t comp_height,
+                               uint32_t decom_h, uint32_t decom_v, uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq,
+                               uint8_t* d_in_raw, int32_t* d_cur, int32_t* d_other, int32_t* d_vert, int32_t* d_pyramid,
+                               uint16_t* d_out_pyramid16, cudaStream_t stream) {
+    if (comp_width < 2 || comp_height < 2 || decom_h < decom_v) {
+        return 1;
+    }
+
+    size_t in_elem_size = (input_bit_depth <= 8) ? sizeof(uint8_t) : sizeof(uint16_t);
+    cudaError_t err = cudaMemcpy2DAsync(d_in_raw,
+                                        plane_stride * in_elem_size,
+                                        in_plane,
+                                        plane_stride * in_elem_size,
+                                        comp_width * in_elem_size,
+                                        comp_height,
+                                        cudaMemcpyHostToDevice,
+                                        stream);
+    if (err != cudaSuccess) {
+        return (int)err;
+    }
+
+    return dwt_component_ctx_body(plane_stride, comp_width, comp_height, decom_h, decom_v, input_bit_depth, hdr_Bw, hdr_Fq,
+                                  d_in_raw, d_cur, d_other, d_vert, d_pyramid, d_out_pyramid16, stream);
+}
+
+/* Packed-input variant (2026-09-02, see PortingStrategy.txt "channel-interleaved
+ * input" section): d_in_raw is assumed ALREADY filled with this component's
+ * planar samples (pitch == comp_width, i.e. no padding) by the caller's
+ * deinterleave kernel -- see EncodeFrameCuda.cu's efc_run_deinterleave_packed()
+ * -- so this skips the H2D copy entirely and reuses the identical downstream
+ * pipeline via dwt_component_ctx_body(). */
+int svt_cuda_dwt_component_ctx_prefilled(uint32_t comp_width, uint32_t comp_height, uint32_t decom_h, uint32_t decom_v,
+                                         uint8_t input_bit_depth, uint8_t hdr_Bw, uint8_t hdr_Fq, uint8_t* d_in_raw,
+                                         int32_t* d_cur, int32_t* d_other, int32_t* d_vert, int32_t* d_pyramid,
+                                         uint16_t* d_out_pyramid16, cudaStream_t stream) {
+    if (comp_width < 2 || comp_height < 2 || decom_h < decom_v) {
+        return 1;
+    }
+
+    return dwt_component_ctx_body(comp_width /* plane_stride == comp_width, no padding */, comp_width, comp_height, decom_h,
+                                  decom_v, input_bit_depth, hdr_Bw, hdr_Fq, d_in_raw, d_cur, d_other, d_vert, d_pyramid,
+                                  d_out_pyramid16, stream);
+}
+
+/* Deinterleaves one frame's worth of packed(AoS) RGB/444 samples into 3
+ * separate planar(SoA) buffers in a single pass (one read of `packed` per
+ * pixel, one write per output plane) -- see PortingStrategy.txt's prototype
+ * benchmark ("[B] 1x fused launch" beat 3 separate per-channel launches by
+ * ~2x, since the latter re-reads the whole packed buffer once per channel). */
+__global__ void k_deinterleave_packed_to_planar_8bit(const uint8_t* __restrict__ packed, uint8_t* __restrict__ out0,
+                                                      uint8_t* __restrict__ out1, uint8_t* __restrict__ out2, uint32_t n) {
+    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n)
+        return;
+    uint32_t base = i * 3;
+    out0[i] = packed[base + 0];
+    out1[i] = packed[base + 1];
+    out2[i] = packed[base + 2];
+}
+
+__global__ void k_deinterleave_packed_to_planar_16bit(const uint16_t* __restrict__ packed, uint16_t* __restrict__ out0,
+                                                       uint16_t* __restrict__ out1, uint16_t* __restrict__ out2, uint32_t n) {
+    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n)
+        return;
+    uint32_t base = i * 3;
+    out0[i] = packed[base + 0];
+    out1[i] = packed[base + 1];
+    out2[i] = packed[base + 2];
+}
+
+int svt_cuda_deinterleave_packed_rgb(const void* d_packed, uint8_t* d_out0, uint8_t* d_out1, uint8_t* d_out2, uint32_t n,
+                                     uint8_t input_bit_depth, cudaStream_t stream) {
+    const uint32_t threads = 256, blocks = (n + threads - 1) / threads;
+    if (input_bit_depth <= 8) {
+        k_deinterleave_packed_to_planar_8bit<<<blocks, threads, 0, stream>>>((const uint8_t*)d_packed, d_out0, d_out1, d_out2, n);
+    }
+    else {
+        k_deinterleave_packed_to_planar_16bit<<<blocks, threads, 0, stream>>>(
+            (const uint16_t*)d_packed, (uint16_t*)d_out0, (uint16_t*)d_out1, (uint16_t*)d_out2, n);
+    }
+    return (int)cudaPeekAtLastError();
 }

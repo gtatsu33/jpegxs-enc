@@ -43,38 +43,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* PPM data is interleaved (R,G,B,R,G,B,...); the encoder's planar RGB format
- * (COLOUR_FORMAT_PLANAR_YUV444_OR_RGB) needs one buffer per channel. */
-static void deinterleave_rgb(const PixelImage_t *image, svt_jpeg_xs_image_buffer_t *dst) {
-    const uint64_t pixels_num = (uint64_t)image->width * image->height;
-    if (image->bytes_per_sample == 1) {
-        const uint8_t *src = image->data;
-        uint8_t *r = (uint8_t *)dst->data_yuv[0];
-        uint8_t *g = (uint8_t *)dst->data_yuv[1];
-        uint8_t *b = (uint8_t *)dst->data_yuv[2];
-        for (uint64_t i = 0; i < pixels_num; i++) {
-            r[i] = src[i * 3 + 0];
-            g[i] = src[i * 3 + 1];
-            b[i] = src[i * 3 + 2];
-        }
-    }
-    else {
-        const uint16_t *src = (const uint16_t *)image->data;
-        uint16_t *r = (uint16_t *)dst->data_yuv[0];
-        uint16_t *g = (uint16_t *)dst->data_yuv[1];
-        uint16_t *b = (uint16_t *)dst->data_yuv[2];
-        for (uint64_t i = 0; i < pixels_num; i++) {
-            r[i] = src[i * 3 + 0];
-            g[i] = src[i * 3 + 1];
-            b[i] = src[i * 3 + 2];
-        }
-    }
+/* PPM data is already channel-interleaved (packed, R,G,B,R,G,B,...) exactly
+ * the way COLOUR_FORMAT_PACKED_YUV444_OR_RGB's single-plane buffer expects
+ * (ImageBuffer.c: stride[0] = width*3 samples, no padding) -- both the CPU
+ * pipeline (which deinterleaves internally, per-line, inside
+ * GcStageProcess.c's DWT input stage) and svt_cuda_encode_frame()'s packed
+ * path (which deinterleaves on the GPU, see EncodeFrameCuda.cu) take this
+ * buffer as-is, so this is a flat memcpy -- no C-side deinterleave loop
+ * needed at all. See PortingStrategy.txt "channel-interleaved input"
+ * section. */
+static void copy_packed_rgb_plane(const PixelImage_t *image, svt_jpeg_xs_image_buffer_t *dst) {
+    const size_t bytes = (size_t)image->width * image->height * 3 * image->bytes_per_sample;
+    memcpy(dst->data_yuv[0], image->data, bytes);
 }
 
 /* Planar YUV422 8-bit input is already laid out the way the encoder's planar
  * buffers expect (Y plane, then U, then V; component strides equal component
  * widths for non-packed formats -- see ImageBuffer.c), so this is a flat
- * per-plane memcpy, unlike deinterleave_rgb() above. */
+ * per-plane memcpy, unlike copy_packed_rgb_plane() above. */
 static void copy_yuv422p8_planes(const PixelImage_t *image, svt_jpeg_xs_image_buffer_t *dst) {
     const uint8_t *src = image->data;
     const size_t y_bytes = (size_t)image->width * image->height;
@@ -207,7 +193,16 @@ int32_t main(int32_t argc, char *argv[]) {
     enc.source_width = image.width;
     enc.source_height = image.height;
     enc.input_bit_depth = (uint8_t)image.bit_depth;
-    enc.colour_format = is_yuv ? COLOUR_FORMAT_PLANAR_YUV422 : COLOUR_FORMAT_PLANAR_YUV444_OR_RGB;
+    /* 2026-09-02: RGB/444 input (PPM) is read from the file already
+     * channel-interleaved (packed, RGBRGB...); COLOUR_FORMAT_PACKED_YUV444_OR_RGB
+     * lets the real CPU pipeline deinterleave it internally (per-line, inside
+     * GcStageProcess.c's DWT input stage) instead of this app doing a
+     * separate whole-frame deinterleave pass in C first -- see
+     * PortingStrategy.txt "channel-interleaved input" section. Requires
+     * cpu_profile == CPU_PROFILE_LOW_LATENCY (EncHandle.c), which is already
+     * this library's default. */
+    enc.colour_format = is_yuv ? COLOUR_FORMAT_PLANAR_YUV422 : COLOUR_FORMAT_PACKED_YUV444_OR_RGB;
+    enc.cpu_profile = CPU_PROFILE_LOW_LATENCY;
     if (is_yuv) {
         /* ISO/IEC 21122-2 defines no "High" (NLy<=2) profile for 4:2:2/4:0:0
          * sampling -- Main (NLy<=1) is the only named profile available, so
@@ -252,7 +247,7 @@ int32_t main(int32_t argc, char *argv[]) {
         copy_yuv422p8_planes(&image, in_buf);
     }
     else {
-        deinterleave_rgb(&image, in_buf);
+        copy_packed_rgb_plane(&image, in_buf);
     }
     pixel_image_free(&image);
 
@@ -374,9 +369,16 @@ int32_t main(int32_t argc, char *argv[]) {
         return -1;
     }
 
+    /* RGB/444 input is packed (COLOUR_FORMAT_PACKED_YUV444_OR_RGB, single
+     * plane in_buf->data_yuv[0]); svt_cuda_encode_frame() deinterleaves it on
+     * the GPU when is_packed_input is set -- only slot 0 is used in that
+     * case (see EncodeFrameCuda.cuh). YUV422 input stays planar (3 real
+     * planes). */
+    uint8_t is_packed_input = !is_yuv;
     const void *in_planes[FCC_MAX_COMPONENTS] = {NULL, NULL, NULL, NULL};
     uint32_t in_stride[FCC_MAX_COMPONENTS] = {0, 0, 0, 0};
-    for (uint32_t c = 0; c < pi->comps_num; c++) {
+    uint32_t comps_to_wire = is_packed_input ? 1 : pi->comps_num;
+    for (uint32_t c = 0; c < comps_to_wire; c++) {
         in_planes[c] = in_buf->data_yuv[c];
         in_stride[c] = in_buf->stride[c];
     }
@@ -420,6 +422,7 @@ int32_t main(int32_t argc, char *argv[]) {
                                 precinct_budgets,
                                 pi->bands_num_exists,
                                 (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num,
+                                is_packed_input,
                                 precinct_data,
                                 &precinct_used_bytes);
     get_current_time(&t1s, &t1m);
@@ -444,6 +447,7 @@ int32_t main(int32_t argc, char *argv[]) {
                                     precinct_budgets,
                                     pi->bands_num_exists,
                                     (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num,
+                                    is_packed_input,
                                     precinct_data,
                                     &precinct_used_bytes);
         get_current_time(&t1s, &t1m);

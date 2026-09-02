@@ -169,8 +169,8 @@ static void run_real_crop444(const char* ppm_path, uint32_t crop_x, uint32_t cro
                                (uint8_t)enc_common->coding_significance,
                                (uint8_t)enc_common->picture_header_dynamic.hdr_Rl, enc_common->pi_enc.max_quantization,
                                enc_common->pi_enc.max_refinement, precinct_budgets.data(), pi->bands_num_exists,
-                               (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, precinct_data.data(),
-                               &precinct_used_bytes);
+                               (uint32_t)pi->p_info[PRECINCT_NORMAL].packets_exist_num, 0 /* is_packed_input */,
+                               precinct_data.data(), &precinct_used_bytes);
     ASSERT_EQ(rc, 0);
 
     std::vector<uint8_t> my_bitstream;

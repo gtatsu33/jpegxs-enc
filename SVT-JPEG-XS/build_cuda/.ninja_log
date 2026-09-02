@@ -258,3 +258,18 @@
 3096	3373	8096604772319060	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1
 55	330	8096609396380331	Source/App/SampleEncoderCuda/CMakeFiles/SvtJpegxsSampleEncoderCuda.dir/main.c.obj	c107d920fa194e87
 331	482	8096609399141366	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+71	414	8100559573092301	Source/App/SampleEncoderCuda/CMakeFiles/SvtJpegxsSampleEncoderCuda.dir/main.c.obj	c107d920fa194e87
+92	944	8100559573309119	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestDwtCuda.cc.obj	7c48d0e1422f2292
+85	952	8100559573231445	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisectRealDwtCuda.cc.obj	b1ec38dfd6130e32
+74	981	8100559573128096	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisectDwtCtx444Cuda.cc.obj	24917369f4a81c58
+81	1329	8100559573198619	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisectRealCrop444Cuda.cc.obj	68cff1a6feee6e6
+88	1359	8100559573267288	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisectSmall444Cuda.cc.obj	638a79c3ec004243
+96	1387	8100559573355852	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestEncodeFrameCuda.cc.obj	94045b2b0cd05c72
+77	1436	8100559573158212	tests/UnitTests/CMakeFiles/SvtJpegxsUnitTests.dir/TestBisectRcLutRealCuda.cc.obj	bd947a9db5f5cc76
+56	1710	8100559572949606	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/DwtCuda.cu.obj	b0e3c033d9908155
+66	1994	8100559573052399	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/FrameContextCuda.cu.obj	72e5d8d354851429
+62	2881	8100559573007155	Source/Lib/Encoder/CUDA/CMakeFiles/ENCODER_CUDA.dir/EncodeFrameCuda.cu.obj	e7422e4613ab37ce
+2882	3110	8100559601208092	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.dll	fa7dd751006e16b3
+2882	3110	8100559601208092	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxs.lib	fa7dd751006e16b3
+2909	3115	8100559601477931	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsSampleEncoderCuda.exe	61f4a2f202ea7855
+55	314	8100559861589044	C:/Users/gtats/python codes/jpegxs-enc/SVT-JPEG-XS/Bin/Release/SvtJpegxsUnitTests.exe	1225729c30319bb1

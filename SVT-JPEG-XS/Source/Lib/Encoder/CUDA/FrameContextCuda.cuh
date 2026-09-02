@@ -55,6 +55,17 @@ typedef struct SvtCudaFrameContext {
 
     /* --- DWT/NLT scratch (reused sequentially across the comps_num DWT calls of one frame; sized to the largest component) --- */
     uint8_t* d_in_raw;
+    /* --- Channel-interleaved(packed) input support (2026-09-02, see
+     * PortingStrategy.txt): d_packed_in holds one frame's packed(AoS) RGB/444
+     * samples after a single contiguous H2D copy; d_in_raw_planes[c] holds
+     * component c's deinterleaved planar samples after
+     * svt_cuda_deinterleave_packed_rgb() -- unlike d_in_raw above, these are
+     * NOT reused sequentially (the fused deinterleave kernel writes all 3
+     * components in one pass, so all 3 must stay live at once for the
+     * per-component DWT loop that follows). Unused (NULL)/zero-sized when
+     * this context's input is planar. */
+    uint8_t* d_packed_in;
+    uint8_t* d_in_raw_planes[FCC_MAX_COMPONENTS];
     int32_t* d_cur;
     int32_t* d_other;
     int32_t* d_vert;
@@ -162,6 +173,10 @@ typedef struct SvtCudaFrameContext {
     uint32_t cap_in_stride[FCC_MAX_COMPONENTS];
     uint32_t cap_decom_h, cap_decom_v;
     uint8_t cap_input_bit_depth, cap_hdr_Bw, cap_hdr_Fq, cap_coding_significance;
+    /* cap_in_planes[0]/cap_in_stride[0] double as the captured packed-buffer
+     * pointer/stride when cap_is_packed_input is set (entries [1..] unused
+     * for packed input, see svt_cuda_encode_frame()). */
+    uint8_t cap_is_packed_input;
 
     cudaGraph_t graph2;
     cudaGraphExec_t graph2_exec;
