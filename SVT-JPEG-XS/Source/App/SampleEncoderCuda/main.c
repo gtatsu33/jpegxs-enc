@@ -52,6 +52,22 @@
  * buffer as-is, so this is a flat memcpy -- no C-side deinterleave loop
  * needed at all. See PortingStrategy.txt "channel-interleaved input"
  * section. */
+/* Releases the TODO H補足 pinned-memory staging buffers (or the plain
+ * malloc()'d precinct_data when use_pinned==0) -- see PortingStrategy.txt
+ * "CUDA側pinned memory化の効果測定". */
+static void release_cuda_staging(int use_pinned, void **pinned_in_planes, uint32_t comps_to_wire,
+                                  uint8_t *precinct_data) {
+    if (use_pinned) {
+        for (uint32_t c = 0; c < comps_to_wire; c++) {
+            cudaFreeHost(pinned_in_planes[c]);
+        }
+        cudaFreeHost(precinct_data);
+    }
+    else {
+        free(precinct_data);
+    }
+}
+
 static void copy_packed_rgb_plane(const PixelImage_t *image, svt_jpeg_xs_image_buffer_t *dst) {
     const size_t bytes = (size_t)image->width * image->height * 3 * image->bytes_per_sample;
     memcpy(dst->data_yuv[0], image->data, bytes);
@@ -155,6 +171,10 @@ int32_t main(int32_t argc, char *argv[]) {
         printf("                 width/height parsed from a \"_WIDTHxHEIGHT_\" token in the filename\n");
         printf("  output_prefix  bitstreams are written to <output_prefix>.cpu.jxs / .cuda.jxs\n");
         printf("  bpp            optional target bits-per-pixel, integer or decimal (e.g. 0.5, 3, 3.75). Default: 3\n");
+        printf("  threads_num    optional CPU encoder thread count override. Default: 1 (matches the\n");
+        printf("                 CPU-vs-CUDA single-thread comparison baseline in PortingStrategy.txt)\n");
+        printf("  pinned         optional 0/1: use CUDA pinned host memory for the GPU path's input\n");
+        printf("                 staging buffer and output bitstream buffer. Default: 1\n");
         printf("Scope: RC_CBR_PER_PRECINCT, source_height evenly divisible by\n");
         printf("the precinct height (see PortingStrategy.txt section 12 / Phase 4a).\n");
         return -1;
@@ -162,6 +182,8 @@ int32_t main(int32_t argc, char *argv[]) {
     const char *input_file_name = argv[1];
     const char *output_prefix = argv[2];
     const char *bpp_arg = argc > 3 ? argv[3] : "3";
+    const uint32_t threads_num_arg = argc > 4 ? (uint32_t)strtoul(argv[4], NULL, 10) : 1;
+    const int use_pinned = argc > 5 ? (int)strtoul(argv[5], NULL, 10) : 1;
 
     int is_yuv = has_suffix_ci(input_file_name, ".yuv");
 
@@ -213,7 +235,9 @@ int32_t main(int32_t argc, char *argv[]) {
         enc.ndecomp_v = 1;
     }
     parse_bpp_arg(bpp_arg, &enc.bpp_numerator, &enc.bpp_denominator);
-    enc.threads_num = 1; /* single-threaded CPU reference, matching the timing methodology in PortingStrategy.txt section 10 */
+    enc.threads_num = threads_num_arg; /* default 1: single-threaded CPU reference, matching the timing
+                                         * methodology in PortingStrategy.txt section 10. Overridable via
+                                         * the optional 4th CLI arg for TODO H's thread-scaling measurement. */
     /* slice_height left at the library default (16, set by
      * svt_jpeg_xs_encoder_load_default_parameters()) -- see PortingStrategy.txt
      * TODO E: an image-height single slice made every named (Main/High)
@@ -378,15 +402,52 @@ int32_t main(int32_t argc, char *argv[]) {
     const void *in_planes[FCC_MAX_COMPONENTS] = {NULL, NULL, NULL, NULL};
     uint32_t in_stride[FCC_MAX_COMPONENTS] = {0, 0, 0, 0};
     uint32_t comps_to_wire = is_packed_input ? 1 : pi->comps_num;
+    /* 2026-09-03 TODO H補足: in_buf->data_yuv[]はライブラリ共通APIの
+     * svt_jpeg_xs_image_buffer_alloc()(通常のcalloc、非pinned)で確保
+     * されており、CPU側send_picture経路とも共有されているため変更しない。
+     * GPU側のH2D転送だけをpinned化して効果を計測するため、use_pinned時は
+     * 別途cudaMallocHostでステージングバッファを確保し、計測区間の外側
+     * (タイマー開始前)で一度だけmemcpyする。PortingStrategy.txt該当セクション
+     * 参照。 */
+    void *pinned_in_planes[FCC_MAX_COMPONENTS] = {NULL, NULL, NULL, NULL};
+    if (use_pinned) {
+        for (uint32_t c = 0; c < comps_to_wire; c++) {
+            if (cudaMallocHost(&pinned_in_planes[c], in_buf->alloc_size[c]) != cudaSuccess) {
+                for (uint32_t k = 0; k < c; k++) {
+                    cudaFreeHost(pinned_in_planes[k]);
+                }
+                svt_cuda_frame_context_destroy(&ctx);
+                free(precinct_budgets);
+                free(out_buf.buffer);
+                svt_jpeg_xs_image_buffer_free(in_buf);
+                svt_jpeg_xs_encoder_close(&enc);
+                return SvtJxsErrorInsufficientResources;
+            }
+            memcpy(pinned_in_planes[c], in_buf->data_yuv[c], in_buf->alloc_size[c]);
+        }
+    }
     for (uint32_t c = 0; c < comps_to_wire; c++) {
-        in_planes[c] = in_buf->data_yuv[c];
+        in_planes[c] = use_pinned ? pinned_in_planes[c] : in_buf->data_yuv[c];
         in_stride[c] = in_buf->stride[c];
     }
 
     uint32_t precinct_capacity = total_precinct_budget_bytes + 4096;
-    uint8_t *precinct_data = malloc(precinct_capacity);
+    uint8_t *precinct_data = NULL;
+    if (use_pinned) {
+        if (cudaMallocHost((void **)&precinct_data, precinct_capacity) != cudaSuccess) {
+            precinct_data = NULL;
+        }
+    }
+    else {
+        precinct_data = malloc(precinct_capacity);
+    }
     uint32_t precinct_used_bytes = 0;
     if (!precinct_data) {
+        if (use_pinned) {
+            for (uint32_t c = 0; c < comps_to_wire; c++) {
+                cudaFreeHost(pinned_in_planes[c]);
+            }
+        }
         svt_cuda_frame_context_destroy(&ctx);
         free(precinct_budgets);
         free(out_buf.buffer);
@@ -456,7 +517,7 @@ int32_t main(int32_t argc, char *argv[]) {
 
     if (rc != 0) {
         printf("svt_cuda_encode_frame failed: %d\n", rc);
-        free(precinct_data);
+        release_cuda_staging(use_pinned, pinned_in_planes, comps_to_wire, precinct_data);
         svt_cuda_frame_context_destroy(&ctx);
         free(precinct_budgets);
         free(out_buf.buffer);
@@ -475,7 +536,7 @@ int32_t main(int32_t argc, char *argv[]) {
         precinct_used_bytes + CODESTREAM_SIZE_BYTES;
     uint8_t *cuda_bitstream = malloc(cuda_bitstream_size);
     if (!cuda_bitstream) {
-        free(precinct_data);
+        release_cuda_staging(use_pinned, pinned_in_planes, comps_to_wire, precinct_data);
         svt_cuda_frame_context_destroy(&ctx);
         free(precinct_budgets);
         free(out_buf.buffer);
@@ -547,7 +608,7 @@ int32_t main(int32_t argc, char *argv[]) {
     }
 
     free(cuda_bitstream);
-    free(precinct_data);
+    release_cuda_staging(use_pinned, pinned_in_planes, comps_to_wire, precinct_data);
     svt_cuda_frame_context_destroy(&ctx);
     free(precinct_budgets);
     free(out_buf.buffer);

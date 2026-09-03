@@ -103,7 +103,8 @@
 <h1>SVT-JPEG-XS CUDA版 エンコード処理時間比較</h1>
 <div class="meta">
     チャンネルインターリーブ(packed RGB)入力のCUDA内デインターリーブ対応の実装前後で行った、
-    testdata 3ファイルに対する実測記録。8月29日版(実装前、フェーズ別内訳込み)→9月2日版(実装後)の順に掲載。
+    testdata 3ファイルに対する実測記録。8月29日版(実装前、フェーズ別内訳込み)→9月2日版(実装後)
+    →9月3日版(CPUマルチスレッド化によるGPU版との速度比較)の順に掲載。
 </div>
 
 <h2>8月29日版<span class="version-tag">2026-08-29</span></h2>
@@ -255,6 +256,81 @@
         <li>CUDA warm: 同一ctxに対する2回目のsvt_cuda_encode_frame()呼び出し(cudaGraphLaunchによるreplayのみ、グラフcapture済み)。</li>
         <li>単独CPUデインターリーブ実測: 旧main.cのdeinterleave_rgb()と同一ロジック(スカラC、単一スレッド、/O2最適化)を該当解像度・ビット深度で50回反復平均。</li>
         <li>全3ファイルともCPU-CUDA bit-exact一致、ISO/IEC 21122-5参照デコーダでの復号成功(exit:0)を確認済み。</li>
+    </ul>
+</div>
+
+<h2>9月3日版<span class="version-tag">2026-09-03</span></h2>
+<div class="meta">
+    TODO H(CPU版のマルチスレッド化でGPU版に近づけるか)の実測。<code>main.c</code>に<code>threads_num</code>を
+    上書きできる第4引数を追加(既定値1は変更なし)し、bpp=4で3ファイル×7段階(threads_num=1, 2, 4, 8, 12, 16, 20)
+    ×各10回実行してCPU側のsend_picture&rarr;get_packet単発往復時間を平均・範囲で記録した。
+</div>
+
+<table>
+    <caption>threads_num別のCPU処理時間(2026-09-03実測、各10回の平均値/範囲、bpp=4)</caption>
+    <thead>
+        <tr>
+            <th>threads_num</th>
+            <th>chart_color<br>(4K 444)</th>
+            <th>eval_fantom1<br>(4K 444)</th>
+            <th>yuv422p8<br>(1080p 422)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td>1</td><td>75.70 ms<br><span style="font-weight:400; color:#888;">(75〜78)</span></td><td>76.90 ms<br><span style="font-weight:400; color:#888;">(76〜78)</span></td><td>15.90 ms<br><span style="font-weight:400; color:#888;">(15〜16)</span></td></tr>
+        <tr><td>2</td><td>75.40 ms<br><span style="font-weight:400; color:#888;">(74〜77)</span></td><td>76.80 ms<br><span style="font-weight:400; color:#888;">(76〜79)</span></td><td>16.00 ms<br><span style="font-weight:400; color:#888;">(15〜17)</span></td></tr>
+        <tr><td>4</td><td>38.70 ms<br><span style="font-weight:400; color:#888;">(38〜40)</span></td><td>38.90 ms<br><span style="font-weight:400; color:#888;">(38〜39)</span></td><td>8.30 ms<br><span style="font-weight:400; color:#888;">(8〜9)</span></td></tr>
+        <tr><td>8</td><td>13.30 ms<br><span style="font-weight:400; color:#888;">(13〜14)</span></td><td>13.50 ms<br><span style="font-weight:400; color:#888;">(13〜14)</span></td><td>3.10 ms<br><span style="font-weight:400; color:#888;">(3〜4)</span></td></tr>
+        <tr><td>12</td><td>8.50 ms<br><span style="font-weight:400; color:#888;">(8〜9)</span></td><td>8.80 ms<br><span style="font-weight:400; color:#888;">(8〜10)</span></td><td>2.50 ms<br><span style="font-weight:400; color:#888;">(2〜4)</span></td></tr>
+        <tr><td>16</td><td>7.00 ms<br><span style="font-weight:400; color:#888;">(7〜7)</span></td><td>7.60 ms<br><span style="font-weight:400; color:#888;">(7〜9)</span></td><td>2.00 ms<br><span style="font-weight:400; color:#888;">(1〜3)</span></td></tr>
+        <tr class="highlight"><td class="highlight">20(全論理コア)</td><td class="highlight">6.30 ms<br><span style="font-weight:400; color:#888;">(6〜7)</span></td><td class="highlight">6.50 ms<br><span style="font-weight:400; color:#888;">(6〜8)</span></td><td class="highlight">2.50 ms<br><span style="font-weight:400; color:#888;">(1〜5)</span></td></tr>
+        <tr><td style="font-style:italic; font-weight:400;">参考: GPU warm(9/2実測)</td><td>9.7 ms (9〜10)</td><td>9.7 ms (9〜10)</td><td>2.7 ms (2〜3)</td></tr>
+    </tbody>
+</table>
+
+<div class="note">
+    <strong>所見</strong>
+    <ul>
+        <li>threads_num=1&rarr;2では有意なスケーリングが見られない(3ファイルとも計測ノイズの範囲内で実質変化なし)。4以降は明確に単調にスケールする。</li>
+        <li>threads_num=20でのCPU/1スレッド比の速度向上率は、chart_color <strong>12.0倍</strong>、eval_fantom1 <strong>11.8倍</strong>、yuv422p8 <strong>6.4倍</strong>(絶対値が小さくノイズの影響が大きい)。444 RGB系2ファイルは、以前の「現実的には8〜12倍程度」という理論見積もりの上限付近〜わずかに上回る結果で、見積もりは概ね妥当だった。</li>
+        <li><strong>444 RGB系2ファイルでは、threads_num=20のCPU版(6.3〜6.5ms)がGPU版のwarm時間(9.7ms)を明確に下回った。</strong>全コアを使えば、このマシンではCPU版の方がGPU版より速い。yuv422p8は両者とも絶対値が小さく(2〜3ms前後)ノイズが支配的なため優劣は断定できない。</li>
+        <li>この比較はCPU側の単発往復時間とGPU側のwarm(グラフ再生のみ)時間の比較であり、GPU側のcold時間・H2D転送・host RC二分探索、および実運用でのCPU資源競合は別途考慮が必要。GPU版host RC二分探索の並列化効果は今回は計測せず(次回以降TODO Bと統合して検討)。</li>
+    </ul>
+</div>
+
+<h2>9月3日版 補足<span class="version-tag">2026-09-03</span></h2>
+<div class="meta">
+    上記のTODO H計測結果を受けて、「GPU側の入出力ホストバッファがpinned memoryでなかった」という
+    見落としを検証した。<code>main.c</code>に<code>[pinned]</code>(0/1)引数を追加し、GPU用の入力ステージング
+    バッファ(<code>cudaMallocHost</code>)と出力バッファを、既存の非pinned(malloc/calloc)実装と比較した
+    (threads_num=1・bpp=4、各10回実行の平均/範囲)。
+</div>
+
+<table>
+    <caption>pinned memory化の効果(2026-09-03実測、CUDA warm/cold、ms)</caption>
+    <thead>
+        <tr>
+            <th>ファイル</th>
+            <th>pinned=0<br>warm</th>
+            <th class="highlight">pinned=1<br>warm</th>
+            <th>pinned=0<br>cold</th>
+            <th>pinned=1<br>cold</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td>chart_color</td><td>10.4 ms (10-11)</td><td class="highlight">7.0 ms (6-8)</td><td>12.5 ms (12-13)</td><td>8.9 ms (8-9)</td></tr>
+        <tr><td>eval_fantom1</td><td>10.2 ms (10-11)</td><td class="highlight">7.0 ms (6-8)</td><td>12.5 ms (12-13)</td><td>8.8 ms (8-9)</td></tr>
+        <tr><td>yuv422p8</td><td>2.9 ms (2-4)</td><td class="highlight">2.7 ms (2-3)</td><td>4.8 ms (4-5)</td><td>4.3 ms (4-5)</td></tr>
+    </tbody>
+</table>
+
+<div class="note">
+    <strong>所見</strong>
+    <ul>
+        <li>444 RGB系2ファイル(入力約50MB)では、pinned化でwarm時間が<strong>約32%短縮</strong>(chart_color/eval_fantom1とも10.2〜10.4ms&rarr;7.0ms)。非pinnedホストメモリのステージングコピーのオーバーヘッドが実測で裏付けられた。</li>
+        <li>yuv422p8(入力約4MB)は効果がノイズの範囲内(2.9&rarr;2.7ms)——転送量が小さく差が埋もれる。</li>
+        <li>正しさは維持(pinned=0/1どちらもCPU-CUDA bit-exact matchを確認)。</li>
+        <li><strong>TODO Hとの統合比較</strong>: pinned化後のGPU warm(7.0ms)は、threads_num=20のCPU(6.3〜6.5ms)と比べると依然CPUがわずかに速いが、差は9.7ms&rarr;6.3〜6.5msという「明確な差」から「ほぼ互角」に縮まった。GPU側の最適化不足が「CPUが勝つ」という結果の一因だったのは事実だが、両者を最適化した後でもCPU優位の傾向自体は残った。両者ともまだ他の最適化余地(GPU: host RC並列化・多フレームオーバーラップ、CPU: コア割り当てチューニング等)が残っており、本ラウンドで優劣を確定させるものではない。</li>
     </ul>
 </div>
 
