@@ -1,0 +1,107 @@
+SVT-JPEG-XSの来歴、およびISO参照ソフト(XSM)とのアルゴリズム比較
+==========================================================
+[2026-09-06 調査記録]
+
+本ドキュメントは、PortingStrategy.txtに記録されているCUDA移植作業とは別に、
+「このプロジェクトがベースとしたSVTソフトウェア自体の来歴」および
+「SVTのC実装とISO参照ソフト(リファレンスエンコーダ)のアルゴリズム的な
+違い」について調査した内容を記録するもの。CUDA移植の実装方針そのものには
+影響しない、背景調査・技術メモの位置づけ。
+
+
+1. SVT-JPEG-XSというソフトウェアの来歴
+--------------------------------------------------
+- SVT = "Scalable Video Technology" の略。Intelが公開しているオープンソースの
+  メディア/コーデック実装群の総称で、SVT-AV1・SVT-HEVC・SVT-VP9などの
+  兄弟プロジェクトがあり、SVT-JPEG-XSはその**JPEG XS(ISO/IEC 21122)実装版**
+  にあたる(`SVT-JPEG-XS/README.md`に "This library is implementation of
+  ISO/IEC 21122 protocol." と明記)。
+- 公開元はIntelの**OpenVisualCloud** organization(GitHub)。
+  `SVT-JPEG-XS/imtl-plugin/README.md`内に
+  `https://github.com/OpenVisualCloud/Media-Transport-Library/...` への参照が
+  あり、SVT-JPEG-XSがOpenVisualCloudエコシステム(Media Transport Library、
+  ffmpeg/gstreamerプラグイン群など)の一部として開発・配布されていることが
+  裏付けられる。
+- ライセンスは**BSD-2-Clause-Patent**("BSD+Patent")、
+  Copyright (c) 2024 Intel Corporation(`SVT-JPEG-XS/LICENSE.md`)。
+- 同梱の`third_party/`には`cpuinfo`・`googletest-1.14.0`・`stb_image`の
+  3つの外部依存が含まれる。
+- `ffmpeg-plugin/`・`imtl-plugin/`・`documentation/`・`.github/workflows/`
+  (Intel公式のCI設定)・`security.md`(Intel脆弱性報告窓口)など、
+  公式配布物の構成がそのまま入っており、フォークして手を加えた形跡ではなく
+  **公式配布物のスナップショット**であることが確認できる。
+- このプロジェクトへの取り込み方法: git submoduleではなく、
+  2026-08-26の`initial`コミット(`c168ffd`)でソースツリー一式が
+  そのままコピーされて追加されている(`.git`ディレクトリなし、
+  `.gitmodules`もなし)。アップストリームのバージョン管理履歴
+  (コミットログ)は引き継がれておらず、ある時点のスナップショットを
+  土台にCUDA移植作業(`Source/Lib/Encoder/CUDA/`以下の追加)を
+  積み重ねてきた形。
+
+
+2. SVTのC実装とISO参照ソフト(XSM)のアルゴリズム的な違い
+--------------------------------------------------
+比較対象のISO参照ソフトは、PortingStrategy.txt 13章に記録済みの
+ISO/IEC 21122-5公式リファレンスソフトウェア("JPEG XS test model (XSM)
+version 3.0.2-ED3"、著作権者: intoPIX SA、Fraunhofer IIS、Canon Inc)。
+このマシンのスクラッチ領域でビルド・実行し、ビットストリームの
+規格適合性検証(独立デコーダでの復号確認)に使用したもの(本体はライセンス
+条件によりgit管理下には含まれていない)。
+
+以下、SVTのソースコードを実地に確認して判明した、参照ソフトとの
+設計思想レベルでの違い。いずれも符号化結果(ビットストリーム)そのものを
+変えるものではなく、同じ規格アルゴリズムを「どう計算するか」の実装戦略の差。
+
+(1) レート制御(GTLI/truncation決定)の探索方法
+  - SVT: `Source/Lib/Encoder/Codec/BinarySearch.c`に汎用の二分探索
+    フレームワーク(`binary_search_init`/`binary_search_next_step`)があり、
+    各precinct/bandごとの切り捨てビット数(GTLI)をこの二分探索で決定。
+  - 参照ソフト(XSM): 規格書のアルゴリズムを逐語的に実装したもので、
+    bandごとの予算配分を仕様書の記述どおり順に評価していく設計
+    (性能ではなく規格適合性の検証が目的のテストモデル)。
+  - → 探索アルゴリズム自体の差。SVTはO(N)の線形探索をO(log N)の
+    二分探索に置き換える、教科書的な高速化が入っている。
+
+(2) ビットコスト計算のLUTキャッシュ化
+  - SVT: `RateControlCacheType.h`/`RateControl.c`の`rate_control_lut_fill()`
+    で、各バンドラインのsignificance(gcli)ヒストグラムを事前に集計し、
+    GTLI候補ごとの符号化ビット数を累積和のルックアップテーブルとして
+    前計算(`gc_lookup_table_size_data_*`)。二分探索の各ステップで
+    毎回コスト計算をやり直すのではなく、テーブル引きで即座に答えを得る。
+  - 参照ソフト: 正確性重視でこうしたキャッシュ構造を持たず、
+    都度計算するのが一般的。
+
+(3) SIMD最適化の網羅度
+  - SVT: `Source/Lib/Encoder/`配下に`ASM_SSE2`/`ASM_SSE4_1`/`ASM_AVX2`/
+    `ASM_AVX512`の4系統のディレクトリがあり、`encoder_dsp_rtcd.c`だけで
+    55関数、`common_dsp_rtcd.c`で21関数がCPU機能を実行時検出(RTCD)して
+    AVX2/AVX512カーネルにディスパッチ。DWTの垂直ループにも明示的に
+    `/*Optimization Vertical lines loops to AVX*/`とコメントあり。
+  - 参照ソフト: ポータブルなスカラC実装が基本で、SIMD最適化は目的外。
+
+(4) 並列化アーキテクチャ
+  - SVT: `Common/Codec/Threads/`(`SystemResourceManager`+`SvtThreads`)を
+    使い、Init/Dwt/Quant/PreRc/Pack/Gc/Finalのステージ分割パイプラインを
+    組み、precinct単位でマルチスレッド処理する
+    (これがTODO Hで`threads_num`を上げてGPUに迫れた理由そのもの)。
+  - 参照ソフト: シングルスレッド逐次処理。
+
+
+3. 結論(「C版のさらなる高速化余地はあるか」への回答)
+--------------------------------------------------
+SVTのC実装はすでに「参照ソフトとの差分」として王道の高速化
+(二分探索・LUTキャッシュ・SIMD・マルチスレッドパイプライン)を
+ひととおり実装済み。つまり「参照ソフトのアルゴリズムをそのまま使っていて、
+まだ手つかずの高速化余地が大きく残っている」という状況ではない。
+
+残っている余地があるとすれば、探索アルゴリズムの入れ替えのような大きな
+話ではなく、実装の詰めの部分:
+  - AVX512カーネルが用意されている関数のうち、実際にこのマシン
+    (Core Ultra 7 265K、P-core/E-core混在)でAVX512パスまで到達しているか
+    (P-core/E-core混在CPUでAVX512の扱いに制約がある可能性)
+  - TODO H(PortingStrategy.txt)で観測した「threads_num 1→2でスケール
+    しない」現象の原因(スレッドプール起動オーバーヘッド or 依存関係の
+    シリアライズ)
+  - RTCD登録関数中、まだSSE2/Cフォールバック止まりの関数が残っていないか
+
+いずれも未着手・未実測。ユーザーから明示的な指示があれば着手する。
