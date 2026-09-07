@@ -1,0 +1,682 @@
+<title>JPEG XS CUDA移植</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#f5f6f4;
+  --surface:#ffffff;
+  --surface-2:#eef1ee;
+  --line:#dbdfd9;
+  --ink:#161918;
+  --ink-soft:#3d4440;
+  --ink-muted:#69716a;
+  --accent:#0e8f83;
+  --accent-soft:#e3f3f1;
+  --accent-line:#bfe4e0;
+  --cpu:#c2661a;
+  --cpu-soft:#fbe9db;
+  --cpu-line:#f0c99b;
+  --good:#2f7d4f;
+  --good-soft:#e5f3ea;
+  --bad:#a23b2e;
+  --bad-soft:#f8e7e4;
+  --shadow:0 1px 2px rgba(20,30,25,.06), 0 8px 24px -16px rgba(20,30,25,.22);
+  --radius:10px;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141715;
+    --surface:#1b1f1c;
+    --surface-2:#20251f;
+    --line:#333a32;
+    --ink:#eef0ec;
+    --ink-soft:#c7cdc3;
+    --ink-muted:#8d968a;
+    --accent:#26b0a2;
+    --accent-soft:#163430;
+    --accent-line:#2b5750;
+    --cpu:#e08a41;
+    --cpu-soft:#3a2a17;
+    --cpu-line:#6b4b23;
+    --good:#4fae76;
+    --good-soft:#173626;
+    --bad:#d6685a;
+    --bad-soft:#3a201c;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -16px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141715;
+  --surface:#1b1f1c;
+  --surface-2:#20251f;
+  --line:#333a32;
+  --ink:#eef0ec;
+  --ink-soft:#c7cdc3;
+  --ink-muted:#8d968a;
+  --accent:#26b0a2;
+  --accent-soft:#163430;
+  --accent-line:#2b5750;
+  --cpu:#e08a41;
+  --cpu-soft:#3a2a17;
+  --cpu-line:#6b4b23;
+  --good:#4fae76;
+  --good-soft:#173626;
+  --bad:#d6685a;
+  --bad-soft:#3a201c;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -16px rgba(0,0,0,.5);
+}
+
+*{box-sizing:border-box;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"IBM Plex Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
+  font-size:15.5px;
+  line-height:1.75;
+}
+h1,h2,h3{
+  font-family:"Source Serif 4",serif;
+  color:var(--ink);
+  text-wrap:balance;
+  font-weight:600;
+}
+.mono, .num, code{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-variant-numeric:tabular-nums;
+}
+a{color:var(--accent);}
+
+.shell{
+  max-width:1180px;
+  margin:0 auto;
+  padding:40px 28px 100px;
+  display:grid;
+  grid-template-columns:220px minmax(0,760px);
+  gap:56px;
+  align-items:start;
+}
+@media (max-width:980px){
+  .shell{grid-template-columns:1fr; gap:0; padding:24px 18px 80px;}
+  nav.toc{display:none;}
+}
+
+/* ---------- header ---------- */
+header.report-head{
+  grid-column:1 / -1;
+  border-bottom:1px solid var(--line);
+  padding-bottom:28px;
+  margin-bottom:8px;
+}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--accent);
+  font-weight:600;
+}
+h1.title{
+  font-size:2.15rem;
+  margin:.35em 0 .3em;
+  line-height:1.2;
+}
+.subhead{
+  color:var(--ink-soft);
+  max-width:62ch;
+  font-size:1.02rem;
+}
+.head-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:18px;
+}
+.chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  border:1px solid var(--line);
+  background:var(--surface);
+  border-radius:999px;
+  padding:5px 12px;
+  font-size:12.5px;
+  color:var(--ink-soft);
+}
+.chip b{color:var(--ink); font-weight:600;}
+.chip .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;}
+
+/* ---------- toc ---------- */
+nav.toc{
+  position:sticky;
+  top:40px;
+  align-self:start;
+  font-size:13px;
+}
+nav.toc .toc-label{
+  font-family:"IBM Plex Mono",monospace;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  font-size:10.5px;
+  color:var(--ink-muted);
+  margin-bottom:10px;
+}
+nav.toc ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+nav.toc a{
+  display:block;
+  padding:6px 0 6px 14px;
+  border-left:2px solid var(--line);
+  color:var(--ink-muted);
+  text-decoration:none;
+  line-height:1.4;
+}
+nav.toc a:hover{color:var(--accent); border-left-color:var(--accent);}
+nav.toc .n{color:var(--ink-muted); font-family:"IBM Plex Mono",monospace; margin-right:6px;}
+
+/* ---------- main content ---------- */
+main{min-width:0;}
+section{
+  padding-top:52px;
+  margin-top:-10px;
+  border-top:1px solid transparent;
+}
+section + section{border-top:1px solid var(--line);}
+.sec-num{
+  font-family:"IBM Plex Mono",monospace;
+  color:var(--accent);
+  font-size:12.5px;
+  letter-spacing:.08em;
+}
+h2{
+  font-size:1.5rem;
+  margin:.2em 0 .6em;
+}
+h3{
+  font-size:1.08rem;
+  margin:1.8em 0 .5em;
+  color:var(--ink);
+}
+p{margin:0 0 1.05em; color:var(--ink-soft); max-width:66ch;}
+p.lead{color:var(--ink); font-size:1.03rem;}
+ul.plain, ol.plain{margin:0 0 1.1em; padding-left:1.3em; color:var(--ink-soft);}
+ul.plain li, ol.plain li{margin-bottom:.4em;}
+strong{color:var(--ink);}
+
+/* stat tiles */
+.stat-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin:22px 0 30px;
+}
+@media(max-width:700px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
+.stat{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:16px 16px 14px;
+  box-shadow:var(--shadow);
+}
+.stat .label{font-size:11.5px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.06em;}
+.stat .value{font-family:"IBM Plex Mono",monospace; font-size:1.5rem; font-weight:600; margin-top:6px; color:var(--ink);}
+.stat .value small{font-size:.55em; color:var(--ink-muted); font-weight:500;}
+.stat .foot{font-size:12px; color:var(--ink-muted); margin-top:4px;}
+.stat.good .value{color:var(--good);}
+
+/* fact list (a)(b)(c) */
+.fact-list{display:flex; flex-direction:column; gap:12px; margin:18px 0 26px;}
+.fact{
+  display:grid;
+  grid-template-columns:34px 1fr;
+  gap:14px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:14px 16px;
+  box-shadow:var(--shadow);
+}
+.fact .tag{
+  font-family:"IBM Plex Mono",monospace;
+  color:var(--accent);
+  font-weight:600;
+  font-size:14px;
+}
+.fact p{margin:0; font-size:14.5px;}
+.fact code{background:var(--surface-2); padding:1px 5px; border-radius:4px; font-size:.92em;}
+
+/* tables */
+.twrap{overflow-x:auto; margin:18px 0 28px; border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);}
+table{border-collapse:collapse; width:100%; font-size:13.5px; background:var(--surface);}
+caption{caption-side:top; text-align:left; font-size:12.5px; color:var(--ink-muted); padding:10px 14px 0;}
+th,td{padding:9px 14px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap;}
+thead th{background:var(--surface-2); font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); font-weight:600;}
+tbody tr:last-child td{border-bottom:none;}
+td.num, th.num{font-family:"IBM Plex Mono",monospace; text-align:right; font-variant-numeric:tabular-nums;}
+
+/* technique cards (5.x) */
+.tech-card{
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  background:var(--surface);
+  box-shadow:var(--shadow);
+  padding:18px 20px;
+  margin:20px 0;
+}
+.tech-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+.tech-head h3{margin:0;}
+.tech-effect{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:12.5px;
+  background:var(--good-soft);
+  color:var(--good);
+  border-radius:999px;
+  padding:4px 11px;
+  white-space:nowrap;
+}
+.before-after{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-top:12px;
+}
+@media(max-width:640px){.before-after{grid-template-columns:1fr;}}
+.ba-block{
+  background:var(--surface-2);
+  border-radius:8px;
+  padding:11px 13px;
+  font-size:13.5px;
+}
+.ba-block .k{
+  font-size:10.5px; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--ink-muted); margin-bottom:5px; font-weight:600;
+}
+.ba-block.after .k{color:var(--accent);}
+
+/* bar charts */
+.chart{margin:20px 0 30px;}
+.chart-title{font-size:12.5px; color:var(--ink-muted); margin-bottom:12px; text-transform:uppercase; letter-spacing:.05em;}
+.bar-row{display:grid; grid-template-columns:120px 1fr 74px; align-items:center; gap:10px; margin-bottom:10px;}
+.bar-row .rlabel{font-size:13px; color:var(--ink-soft);}
+.bar-track{background:var(--surface-2); border-radius:5px; height:20px; position:relative; overflow:hidden;}
+.bar-fill{height:100%; border-radius:5px 0 0 5px; display:flex; align-items:center;}
+.bar-fill.cuda{background:var(--accent);}
+.bar-fill.cpu{background:var(--cpu);}
+.bar-val{font-family:"IBM Plex Mono",monospace; font-size:12.5px; text-align:right; color:var(--ink-soft);}
+.legend{display:flex; gap:18px; font-size:12.5px; color:var(--ink-muted); margin-bottom:14px;}
+.legend span{display:inline-flex; align-items:center; gap:6px;}
+.legend i{width:10px; height:10px; border-radius:3px; display:inline-block;}
+.legend i.cuda{background:var(--accent);} .legend i.cpu{background:var(--cpu);}
+
+.seg-bar{display:flex; height:34px; border-radius:8px; overflow:hidden; border:1px solid var(--line);}
+.seg{display:flex; align-items:center; justify-content:center; font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:#fff;}
+.seg.g1{background:var(--accent);}
+.seg.rc{background:var(--ink-muted);}
+.seg.g2{background:var(--cpu);}
+.seg-legend{display:flex; gap:16px; font-size:12px; color:var(--ink-muted); margin-top:8px; flex-wrap:wrap;}
+.seg-legend span{display:inline-flex; align-items:center; gap:6px;}
+.seg-legend i{width:9px;height:9px;border-radius:2px;display:inline-block;}
+.seg-legend i.g1{background:var(--accent);} .seg-legend i.rc{background:var(--ink-muted);} .seg-legend i.g2{background:var(--cpu);}
+
+/* callouts */
+.callout{
+  border-radius:var(--radius);
+  padding:14px 18px;
+  margin:18px 0;
+  font-size:14px;
+  border:1px solid var(--line);
+}
+.callout.warn{background:var(--bad-soft); border-color:var(--bad); color:var(--ink);}
+.callout.good{background:var(--good-soft); border-color:var(--good); color:var(--ink);}
+.callout .cl-label{font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:5px;}
+.callout.warn .cl-label{color:var(--bad);}
+.callout.good .cl-label{color:var(--good);}
+
+/* graph pipeline diagram */
+.pipeline{
+  display:flex; align-items:stretch; gap:0; margin:22px 0 8px; flex-wrap:wrap;
+}
+.pnode{
+  background:var(--surface); border:1px solid var(--line); border-radius:8px;
+  padding:12px 16px; font-size:12.5px; box-shadow:var(--shadow); flex:1; min-width:150px;
+}
+.pnode .pt{font-family:"IBM Plex Mono",monospace; color:var(--accent); font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;}
+.pnode .pn{font-weight:600; margin:4px 0 3px; color:var(--ink);}
+.pnode .pd{color:var(--ink-muted); font-size:12px;}
+.parrow{display:flex; align-items:center; justify-content:center; padding:0 8px; color:var(--ink-muted); font-size:18px;}
+
+/* budget bar for 2ms stretch goal */
+.budget{margin:20px 0 10px;}
+.budget-track{position:relative; height:46px; background:var(--surface-2); border-radius:8px; overflow:visible; border:1px solid var(--line);}
+.budget-fill{position:absolute; top:0; bottom:0; left:0; display:flex; align-items:center; border-radius:8px 0 0 8px;}
+.budget-mark{position:absolute; top:-6px; bottom:-6px; width:2px; background:var(--bad);}
+.budget-mark .lab{position:absolute; top:-22px; left:50%; transform:translateX(-50%); font-size:11px; font-family:"IBM Plex Mono",monospace; color:var(--bad); white-space:nowrap;}
+.budget-seg{height:100%; display:flex; align-items:center; justify-content:center; font-family:"IBM Plex Mono",monospace; font-size:11px; color:#fff;}
+
+footer.report-foot{
+  grid-column:1/-1;
+  margin-top:60px;
+  padding-top:22px;
+  border-top:1px solid var(--line);
+  color:var(--ink-muted);
+  font-size:12.5px;
+}
+</style>
+
+<div class="shell">
+  <header class="report-head">
+    <div class="eyebrow">Engineering Report</div>
+    <h1 class="title">SVT-JPEG-XS エンコーダ CUDA移植</h1>
+    <p class="subhead lead">4K・10bit静止画1枚を対象に、SVT-JPEG-XSのCUDA移植で採用した並列化アルゴリズムと、実機NVIDIA&nbsp;RTX&nbsp;5070&nbsp;Tiでの実測結果、およびISO/IEC&nbsp;21122公式リファレンスデコーダによる規格適合性検証をまとめる。</p>
+    <div class="head-chips">
+      <span class="chip"><span class="dot"></span>入力: 3840×2160, 10bit</span>
+      <span class="chip"><span class="dot"></span>理想目標: <b>16 ms</b>/frame</span>
+      <span class="chip"><span class="dot"></span>現実目標: <b>33 ms</b>/frame</span>
+      <span class="chip"><span class="dot"></span>実機達成: <b>約 9〜10 ms</b></span>
+      <span class="chip"><span class="dot"></span>ISO参照デコーダ: <b>復号成功</b></span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <div class="toc-label">目次</div>
+    <ol>
+      <li><a href="#s1"><span class="n">01</span>要旨</a></li>
+      <li><a href="#s2"><span class="n">02</span>背景とC実装の設計</a></li>
+      <li><a href="#s3"><span class="n">03</span>並列化を可能にした規格特性</a></li>
+      <li><a href="#s4"><span class="n">04</span>CUDA実装アーキテクチャ</a></li>
+      <li><a href="#s5"><span class="n">05</span>アルゴリズムと並列化の核心</a></li>
+      <li><a href="#s6"><span class="n">06</span>性能評価</a></li>
+      <li><a href="#s7"><span class="n">07</span>規格適合性の独立検証</a></li>
+      <li><a href="#s8"><span class="n">08</span>結論と今後の課題</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ============ 1 ============ -->
+    <section id="s1">
+      <div class="sec-num">01 / 08</div>
+      <h2>要旨</h2>
+      <p class="lead">SVT-JPEG-XS(Intel OpenVisualCloudが公開するISO/IEC 21122実装)のエンコーダを、4K・10bit静止画1枚を16ms以内(60fps相当の理想目標)、遅くとも33ms以内(30fps相当の現実目標)で処理することを目指してCUDAへ移植した。単なる逐次Cコードの機械的な並列化ではなく、規格自体が持つバイトアライメント境界やprecinct間の独立性を利用し、ステージごとに異なる並列アルゴリズムを設計している。</p>
+
+      <div class="stat-grid">
+        <div class="stat good">
+          <div class="label">実機 warm 合計</div>
+          <div class="value">9〜10<small> ms</small></div>
+          <div class="foot">RTX 5070 Ti, 4K/10bit RGB</div>
+        </div>
+        <div class="stat">
+          <div class="label">CPU比 speedup</div>
+          <div class="value">約 6.8×<small> vs 単一スレッド</small></div>
+          <div class="foot">CPU 65.6ms → CUDA 9.7ms</div>
+        </div>
+        <div class="stat">
+          <div class="label">画質 (bpp=4, 444 RGB)</div>
+          <div class="value">43.9<small> dB PSNR</small></div>
+          <div class="foot">目視でも劣化を確認できず</div>
+        </div>
+        <div class="stat good">
+          <div class="label">規格適合性</div>
+          <div class="value">exit:0</div>
+          <div class="foot">ISO/IEC 21122-5 公式デコーダ</div>
+        </div>
+      </div>
+
+      <p>正しさの検証は二段構えで行った。CPU参照実装とのビット完全一致(bit-exact)を全工程・全回帰テスト(12000件超)で維持したうえで、それとは独立に ISO/IEC 21122-5 公式リファレンスソフトウェア(通称 XSM)による復号可能性も確認した。後者の検証過程でCUDA移植そのものとは無関係な、ベースのC実装側の規格適合バグ2件も発見・修正している(<a href="#s7">7章</a>)。</p>
+    </section>
+
+    <!-- ============ 2 ============ -->
+    <section id="s2">
+      <div class="sec-num">02 / 08</div>
+      <h2>背景: SVT-JPEG-XSというソフトウェアと、そのC実装の設計</h2>
+      <p>SVT(Scalable Video Technology)は Intel が公開するオープンソースのメディア/コーデック実装群の総称で、SVT-AV1・SVT-HEVC・SVT-VP9 などの兄弟プロジェクトを持つ。SVT-JPEG-XS はその <strong>ISO/IEC 21122(JPEG XS)実装</strong>にあたり、公開元は Intel の OpenVisualCloud organization、ライセンスは BSD-2-Clause-Patent である。本プロジェクトへは git submodule ではなく、ある時点のソースツリー一式をスナップショットとして取り込み、その上に <code>Source/Lib/Encoder/CUDA/</code> 以下としてCUDA実装を積み上げている。</p>
+
+      <p>移植の出発点を正しく理解するうえで重要なのは、SVTのC実装が ISO 公式リファレンスソフトウェア(XSM, intoPIX SA / Fraunhofer IIS / Canon Inc著作)そのままの素朴な実装ではなく、<strong>教科書的な高速化を一通り実装済みの状態</strong>だったという点である。両者をソースコードレベルで比較すると、次の4点で設計思想が異なる。</p>
+
+      <div class="twrap">
+        <table>
+          <caption>SVT C実装 と ISO参照ソフト(XSM)の設計上の違い(いずれもビットストリーム自体は変えない、計算戦略の差)</caption>
+          <thead><tr><th>観点</th><th>SVT (このプロジェクトの移植元)</th><th>ISO参照ソフト (XSM)</th></tr></thead>
+          <tbody>
+            <tr><td>GTLI/truncation決定</td><td><code>BinarySearch.c</code> による汎用二分探索</td><td>規格書の記述どおり逐次評価する線形探索</td></tr>
+            <tr><td>ビットコスト計算</td><td>significance/gcliヒストグラムを事前集計したLUTの引き当て</td><td>都度計算(正確性重視、キャッシュ構造なし)</td></tr>
+            <tr><td>SIMD最適化</td><td>SSE2/SSE4.1/AVX2/AVX512、RTCD経由で実行時ディスパッチ(76関数)</td><td>ポータブルなスカラC実装</td></tr>
+            <tr><td>並列化アーキテクチャ</td><td>ステージ分割パイプライン + precinct単位マルチスレッド</td><td>シングルスレッド逐次処理</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>したがってCUDA移植は、「素朴な参照実装を並列化する」のではなく、<strong>既に二分探索・LUTキャッシュ・SIMD・マルチスレッドパイプラインで最適化されたC実装を上回る</strong>ことを求められる移植だった。この前提は<a href="#s6">6章</a>のCPUマルチスレッド版との速度比較にも直結する。</p>
+    </section>
+
+    <!-- ============ 3 ============ -->
+    <section id="s3">
+      <div class="sec-num">03 / 08</div>
+      <h2>並列化を可能にした規格特性</h2>
+      <p>SVTのエンコーダは実際には <code>Init(1スレッド)→ Dwt(componentごとの別スレッドプール)→ Pack(DWT・GC・レート制御・量子化・ビットストリームパックが1関数チェーンに密結合)→ Final</code> という3〜4段構成になっている。この構造をコード上で精査した結果、GPU並列化の設計を成立させる3つの事実が確認できた。</p>
+
+      <div class="fact-list">
+        <div class="fact">
+          <div class="tag">(a)</div>
+          <p><code>gc_precinct_stage_scalar_loop_c</code> が行う significance / gcli 算出は、4係数グループ単位の OR演算 + log2 のみで構成され、精度内・精度間を問わず完全に独立している。</p>
+        </div>
+        <div class="fact">
+          <div class="tag">(b)</div>
+          <p><code>rate_control_precinct()</code> は precinct 単位で完結する二分探索であり、4K画像で数千個におよぶ precinct 同士に依存関係がない(垂直予測 VPRED を無効化したデフォルト構成を前提とする)。</p>
+        </div>
+        <div class="fact">
+          <div class="tag">(c)</div>
+          <p><code>align_bitstream_writer_to_next_byte()</code> が precinct・line単位で頻繁に呼ばれ、ビットストリームは規格上バイト境界でアライメントされる。JPEG XS が低遅延・並列実装を明示的に意図した規格である証拠であり、JPEG2000の算術符号化のような全体逐次依存は存在しない。</p>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <div class="cl-label">重要な限定条件: MOVE_PADDINGモードは対象外</div>
+        <p style="margin:0;">事実(b)の「precinct間に依存関係がない」は、VPRED無効に加えてもう一つ前提を置いている。SVTのレート制御には <code>RC_CBR_PER_PRECINCT</code>(均等配分、precinct間独立)と <code>RC_CBR_PER_PRECINCT_MOVE_PADDING</code>(<strong>ライブラリのデフォルト</strong>。各precinctの使い残しバイトを次のprecinctへ繰り越す、平均で面積の約3%相当)の2モードがあり、後者は繰り越しによってprecinct間に<strong>真の逐次依存</strong>を生む。この依存は、事前計算した予算配列をホスト側で用意してGPUへ渡す本移植のバッチ設計とは両立しないため、<strong>CUDA移植は繰り越しのない<code>RC_CBR_PER_PRECINCT</code>のみをスコープとし、デフォルトである<code>MOVE_PADDING</code>モードは対象外とした</strong>。呼び出し側はCUDA経路を使う場合、このモード選択を明示する必要がある。</p>
+      </div>
+
+      <p>この3点により、DWT・量子化・GCだけでなく、レート制御とビットストリームパッキングまで含めてGPU並列化の設計が成立する見込みが立った。裏を返せば、規格がバイト境界での分断を許していなければ、パッキング段は原理的にGPU向きではなかった。</p>
+    </section>
+
+    <!-- ============ 4 ============ -->
+    <section id="s4">
+      <div class="sec-num">04 / 08</div>
+      <h2>CUDA実装アーキテクチャ</h2>
+      <p>各ステージは「全precinctを一括処理する巨大カーネル」に融合し、フレーム全体を2本のCUDA Graphとして連結してカーネル起動オーバーヘッドを最小化している。graph1とgraph2の間に挟まる二分探索だけはホストCPU側で実行する(precinct単位の予算配分は計算量が軽く、GPU化する必要がないため)。</p>
+
+      <div class="pipeline">
+        <div class="pnode">
+          <div class="pt">CUDA Graph 1</div>
+          <div class="pn">NLT + DWT + GC/significance + RC-LUT構築</div>
+          <div class="pd">DWTがこの区間の8〜9割を占め、実機で全体の最大の比重</div>
+        </div>
+        <div class="parrow">→</div>
+        <div class="pnode">
+          <div class="pt">Host (CPU)</div>
+          <div class="pn">precinct単位 二分探索</div>
+          <div class="pd">540 precincts、GPU非依存の軽量処理</div>
+        </div>
+        <div class="parrow">→</div>
+        <div class="pnode">
+          <div class="pt">CUDA Graph 2</div>
+          <div class="pn">量子化 + ビットストリームパック</div>
+          <div class="pd">係数グループ単位のscatter書き込みで並列化</div>
+        </div>
+      </div>
+
+      <div class="twrap">
+        <table>
+          <caption>ステージ別のGPUマッピング</caption>
+          <thead><tr><th>ステージ</th><th>並列粒度</th><th>実装方式</th></tr></thead>
+          <tbody>
+            <tr><td>NLT / 色変換</td><td>画素単位</td><td>単純elementwiseカーネル、帯域律速</td></tr>
+            <tr><td>DWT変換</td><td>行/バンド単位</td><td>shared memoryタイル化、halo読み込み</td></tr>
+            <tr><td>量子化</td><td>係数単位</td><td>2次元grid、1スレッド=1要素</td></tr>
+            <tr><td>GC (gcli/significance)</td><td>4係数グループ単位</td><td>OR+log2のみ、完全並列</td></tr>
+            <tr><td>レート制御</td><td>precinct単位</td><td>1 precinct = 1 block、ブロック内完結の二分探索</td></tr>
+            <tr><td>ビットストリームパック</td><td>係数グループ単位</td><td>atomicOrスキャッター + ワープ単位prefix scan</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>これを支える基盤として、<code>SvtCudaFrameContext</code> によるフレーム単位の永続デバイスバッファ(呼び出し毎の <code>cudaMalloc</code>/<code>cudaFree</code>を撤廃)と、pinned host memory + 非同期転送(<code>cudaMemcpyAsync</code>)を採用している。永続バッファ化以前は、素朴な「呼び出し毎に確保・解放」する実装がボトルネックの主因であり、CUDA Graph化そのものより先にここを潰す必要があった。</p>
+    </section>
+
+    <!-- ============ 5 ============ -->
+    <section id="s5">
+      <div class="sec-num">05 / 08</div>
+      <h2>Cと異なるアルゴリズム・並列化の核心</h2>
+      <p class="lead">ここが本移植の本題である。各ステージについて、Cの逐次/スレッド単位の実装をどのような並列アルゴリズムへ置き換えたかを示す。</p>
+
+      <div class="tech-card">
+        <div class="tech-head"><h3>5.1 DWT — shared memoryタイル化</h3><span class="tech-effect">フレーム全体 18.4ms → 約7ms(タイル化直後)</span></div>
+        <p>5/3可逆リフティングは、高域係数 <code>hf</code> が入力のみに依存して完全並列に計算でき、低域係数 <code>lf</code> は確定済みの <code>hf</code> のみに依存して並列計算できるという性質を持つ。この性質を使い、水平方向のリフトカーネルを「1スレッド=1行の逐次処理」から「1行=1 CUDA block によるshared memory協調タイル処理」へ書き換えた。数式・境界処理自体は変更せず、メモリアクセスパターンとスレッド割当のみを再設計している。</p>
+        <div class="before-after">
+          <div class="ba-block"><div class="k">C / 移植前</div>1スレッドが1行(または1列)を先頭から末尾まで逐次リフト</div>
+          <div class="ba-block after"><div class="k">CUDA</div>1ブロックが1行を担当し、halo込みタイルをshared memoryへロードして協調計算</div>
+        </div>
+        <p style="margin-top:12px;">実機ではDWTがメモリ帯域律速(演算強度 約0.44 ops/byte)であることが判明しており、現状は理論ピーク帯域の約29%しか使えていない。graph1全体(NLT+DWT+GC+RC-LUT)の8〜9割をDWTが占め、現時点で最大の残存ボトルネックである(<a href="#s6">6章</a>、<a href="#s8">8章</a>)。</p>
+      </div>
+
+      <div class="tech-card">
+        <div class="tech-head"><h3>5.2 GC (gcli / significance) — 完全並列カーネル</h3><span class="tech-effect">依存ゼロ、単純elementwise化</span></div>
+        <p>4係数グループ単位の OR演算 + log2 のみで構成されるため、C側の逐次ループをそのまま「1スレッド=1グループ」の完全並列カーネルへ置き換えるだけで済む。精度内・精度間の依存が存在しないことが<a href="#s3">3章</a>の事実(a)で確認済みだったため、設計上の工夫を要さなかった数少ないステージ。</p>
+      </div>
+
+      <div class="tech-card">
+        <div class="tech-head"><h3>5.3 レート制御 — ブロック内完結の二分探索</h3><span class="tech-effect">追加カーネル起動なし</span></div>
+        <p>探索アルゴリズム自体はC版の二分探索を踏襲しつつ、precinct を1つの CUDA block に割り当て、コスト計算をブロック内リダクションで行うことで、探索ループ全体をブロック内で完結させた。これにより複数回のグローバル同期を伴うカーネル再起動を避けている。</p>
+      </div>
+
+      <div class="tech-card">
+        <div class="tech-head"><h3>5.4 量子化 — 1次元逐次ループから2次元gridへ</h3><span class="tech-effect">単体 11.5ms → 0.78ms(約14.7倍)</span></div>
+        <p>量子化は係数ごとに完全独立で、DWTのような隣接依存を持たない。にもかかわらず初期実装は「1スレッド=1行、幅方向は<code>for</code>ループで逐次処理」というCの構造をそのまま引き継いだ素朴な移植になっていた。この点は長らく見過ごされ、Pack段の最適化(5.5節)に注力していた時期には「量子化+パック」を1つの区間として計測していたため、量子化側の非効率が表面化していなかった。</p>
+        <div class="before-after">
+          <div class="ba-block"><div class="k">移植当初</div>1スレッド=1行、幅方向は逐次forループ(Cの行単位ループを1:1移植)</div>
+          <div class="ba-block after"><div class="k">修正後</div>2次元grid(<code>dim3 block2d(32,8)</code>)、1スレッド=1係数。数式・分岐は無変更、インデックス計算のみ書き換え</div>
+        </div>
+        <p style="margin-top:12px;">内訳を分離計測して初めて「Packではなく量子化こそが真のボトルネック」と判明し、この1点の修正でフレーム全体のwarm時間が約20〜21msから約9〜10msへ、約2.1倍短縮した。プロジェクト全体を通じて最大の単発改善効果であり、複合カーネル区間を1つの数値のままにしておくことの危うさを示す実例として記録に残す。</p>
+      </div>
+
+      <div class="tech-card">
+        <div class="tech-head"><h3>5.5 ビットストリームパッキング — 係数グループ単位のscatter書き込み</h3><span class="tech-effect">長さ計算→スキャン→スキャッターの3段構成</span></div>
+        <p>ビット単位の可変長符号化はグローバルには逐次的に見えるが、規格が持つバイトアライメント境界(<a href="#s3">3章</a>事実(c))を利用し、「長さ計算 (Pass A) → prefix-sum スキャン (Pass B) → スキャッター書き込み (Pass C)」という定型パターンに帰着させた。粒度は当初 precinct/band 単位を検討したが、band幅がDWT分解レベルごとに約60〜1920まで桁違いに分散し、SIMT実行モデルではワープ全体が最も重いスレッドに律速されるため、<strong>係数グループ単位</strong>まで踏み込む設計に修正している。</p>
+        <div class="before-after">
+          <div class="ba-block"><div class="k">significance(1bit/group)</div>固定長のためPass A不要。各スレッドがビット位置を直接計算し、アライメント済み<code>atomicOr</code>で書き込む</div>
+          <div class="ba-block after"><div class="k">gcli / data(可変長)</div>128スレッドによるblocked partition局所スキャン + <code>__shfl_up_sync</code>によるワープ単位exclusiveスキャンでオフセットを求め、Pass Cで<code>atomicOr</code>スキャッター</div>
+        </div>
+        <p style="margin-top:12px;">当初はband単位で部分並列化したが、1 packetあたりのband数が平均約3にとどまり128スレッド中ごく一部しか稼働しない構造的な非効率が残った。<strong>band単位ではなく係数グループ単位のフラットなスキャンに設計を変更</strong>したことで、この非効率を解消している。data(可変長ニブル書き込み)は「通常グループ」と「末尾の端数グループ」を有効レーン数1パラメータで統一した単一の計算式に置き換え、逐次的な左シフト状態機械を状態を持たない直接計算式へ再設計した。</p>
+      </div>
+
+      <div class="tech-card">
+        <div class="tech-head"><h3>5.6 チャンネルデインターリーブ — GPUパイプラインへの統合</h3><span class="tech-effect">CPU側 約1.5ms相当の隠れコストを排除</span></div>
+        <p>PPMのRGBRGB…インターリーブ入力は、当初CUDA外のCコードで事前にプレーナ化してから両パスへ渡していた。これをCUDA Graph 1の内部に組み込んだ専用カーネルへ移し、H2D転送1回とデインターリーブを1回のfusedカーネル(3チャンネルを1パスで同時に書き出す)にまとめた。コンポーネントごとに3回へ分けるとpackedバッファを3回冗長に読み直すことになり、fused版はそれよりも約2倍速いことを実測で確認している。</p>
+      </div>
+    </section>
+
+    <!-- ============ 6 ============ -->
+    <section id="s6">
+      <div class="sec-num">06 / 08</div>
+      <h2>性能評価</h2>
+
+      <h3>実機(RTX 5070 Ti)での最終内訳</h3>
+      <p>量子化の2次元grid化(5.4節)後の、chart_color実画像(3840×2160, 10bit RGB)における warm 状態の内訳は次のとおり。DWTを含むgraph1が全体の7割超を占め、現時点で最大のレバーであり続けている。</p>
+
+      <div class="chart">
+        <div class="chart-title">フレーム内訳(実機 RTX 5070 Ti, warm, 合計 約9.9ms)</div>
+        <div class="seg-bar">
+          <div class="seg g1" style="width:72%">graph1 約7.1ms</div>
+          <div class="seg rc" style="width:12%">RC 約1.16ms</div>
+          <div class="seg g2" style="width:16%">graph2 約1.55ms</div>
+        </div>
+        <div class="seg-legend">
+          <span><i class="g1"></i>graph1: NLT+DWT+GC+RC-LUT構築</span>
+          <span><i class="rc"></i>host RC二分探索(CPU)</span>
+          <span><i class="g2"></i>graph2: 量子化+Pack</span>
+        </div>
+      </div>
+
+      <h3>testdata 3ファイルの CPU(単一スレッド) vs CUDA</h3>
+      <div class="chart">
+        <div class="legend"><span><i class="cpu"></i>CPU(threads_num=1)</span><span><i class="cuda"></i>CUDA warm(pinned memory)</span></div>
+        <div class="bar-row"><div class="rlabel">chart_color<br><span class="mono" style="font-size:11px;color:var(--ink-muted)">4K 444 RGB</span></div><div class="bar-track"><div class="bar-fill cpu" style="width:100%"></div></div><div class="bar-val">65.6 ms</div></div>
+        <div class="bar-row"><div class="rlabel"></div><div class="bar-track"><div class="bar-fill cuda" style="width:14.8%"></div></div><div class="bar-val">9.7 ms</div></div>
+        <div class="bar-row"><div class="rlabel">eval_fantom1<br><span class="mono" style="font-size:11px;color:var(--ink-muted)">4K 444 RGB</span></div><div class="bar-track"><div class="bar-fill cpu" style="width:100%"></div></div><div class="bar-val">70.1 ms</div></div>
+        <div class="bar-row"><div class="rlabel"></div><div class="bar-track"><div class="bar-fill cuda" style="width:13.8%"></div></div><div class="bar-val">9.7 ms</div></div>
+        <div class="bar-row"><div class="rlabel">yuv422p8<br><span class="mono" style="font-size:11px;color:var(--ink-muted)">1080p 422</span></div><div class="bar-track"><div class="bar-fill cpu" style="width:100%"></div></div><div class="bar-val">15.5 ms</div></div>
+        <div class="bar-row"><div class="rlabel"></div><div class="bar-track"><div class="bar-fill cuda" style="width:17.4%"></div></div><div class="bar-val">2.7 ms</div></div>
+      </div>
+      <p>単一スレッドCPU比では約5.7〜7.2倍のスピードアップ。ただし、この比較は「CPU側は基準を揃えるため意図的に<code>threads_num=1</code>に固定」した条件であり、実運用でCPU側の全コアを解放した場合の比較にはならない点に注意が必要である。</p>
+
+      <div class="callout warn">
+        <div class="cl-label">正直な注記: マルチスレッドCPUとの比較</div>
+        <p style="margin:0;">このマシン(Intel Core Ultra 7 265K, 20論理コア)で <code>threads_num</code> を段階的に上げて実測したところ、4スレッド以降は単調にスケールし、20スレッドでは444 RGB系ファイルで単一スレッド比 約12倍(6.3〜6.5ms)に達した。これは pinned memory 化後のGPU warm時間(約7.0ms)と<strong>ほぼ互角、わずかにCPUが優位</strong>という結果であり、「全コアを使い切ったCPU実装がこのGPU実装に競り勝つ場合がある」ことを示している。GPU側にも host RC二分探索の並列化など残された最適化余地はあるが、本レポート時点でCPU/GPUの優劣を最終的に決着させるものではない。</p>
+      </div>
+
+      <h3>DWTの帯域効率</h3>
+      <p>DWTは演算強度 約0.44 ops/byte のメモリ帯域律速カーネルであり、実機の理論帯域(約896GB/s)に対する理論下限を大きく上回る実測時間がかかっている——現状の帯域利用効率は理論ピークの<strong>約29%</strong>にとどまる。ブロックサイズ調整(Step B1)は開発機・実機いずれでも有意な改善が確認できず、バンド単位のshift融合(Step B2)は約7〜9%、NLT融合(Step B3)は約3%の改善にとどまった。DWTのメモリトラフィック削減という方向のアプローチ単体では、理論値ほどの改善が実機で得られにくいことが複数回の実験で確認されている。</p>
+    </section>
+
+    <!-- ============ 7 ============ -->
+    <section id="s7">
+      <div class="sec-num">07 / 08</div>
+      <h2>規格適合性の独立検証</h2>
+      <p>これまでの正しさの検証はCPU参照実装とのbit-exact比較のみであり、実際のJPEG XS規格適合性(他社デコーダでの復号可能性)は検証していなかった。そこでISO/IEC 21122-5公式リファレンスソフトウェア(<em>JPEG XS test model, XSM v3.0.2-ED3</em>、著作権者: intoPIX SA / Fraunhofer IIS / Canon Inc)をISO公式サイトから導入し、評価目的ライセンスに従いこのリポジトリのgit管理下には含めず、スクラッチ領域のみでビルド・検証した。</p>
+
+      <p>この検証を通じて、<strong>CUDA移植そのものとは無関係な、ベースC実装(CPU/CUDA共通コード)側の規格適合バグを2件</strong>発見・修正した。</p>
+
+      <div class="fact-list">
+        <div class="fact">
+          <div class="tag">Bug 1</div>
+          <p><code>derive_stream_profile_ppih()</code> が実際の垂直分解レベル数 <code>decom_v</code> を考慮せずプロファイルを宣言していた。デフォルトの <code>ndecomp_v=2</code> はMainプロファイルの制約(最大垂直分解レベル1)を超えており、生成された全ビットストリームが規格上非適合な宣言のまま出力されていた。420/444/4444では <code>decom_v&gt;1</code> でHighプロファイルを宣言するよう修正。422/400はISO/IEC 21122-2自体にHigh相当のcodewordが定義されておらず、規格上の既知の制限として文書化した。</p>
+        </div>
+        <div class="fact">
+          <div class="tag">Bug 2</div>
+          <p>名前付きプロファイル(Main/High)を宣言する場合、ISO参照ソフトは <code>slice_height=16</code> を要求するが、サンプルアプリはPhase 4aのスコープ決定により単一slice(<code>slice_height=画像高さ</code>)を採用していた。既存のホスト側precinctオフセット/バイト長配列を使い、<strong>GPUカーネル自体には一切手を入れず</strong>、slice境界ごとの範囲memcpy + ヘッダ挿入によるマルチslice組み立てをホスト側に実装して解決した。</p>
+        </div>
+      </div>
+
+      <div class="callout good">
+        <div class="cl-label">検証結果</div>
+        <p style="margin:0;">上記2件の修正後、testdata 3ファイル全てがISO参照デコーダで <code>exit:0</code> の復号成功に到達した。444 RGB系の実写2ファイルはPSNR 43.87dB / 42.69dB(bpp=4)を記録し目視でも劣化は確認できず、合成テストパターンである1080p YUV422ファイルのみ低PSNR(14.62dB)だったが、これは非圧縮性の乱数パターンを4:1圧縮した結果として正常な挙動であることを切り分け済みである。</p>
+      </div>
+    </section>
+
+    <!-- ============ 8 ============ -->
+    <section id="s8">
+      <div class="sec-num">08 / 08</div>
+      <h2>結論と今後の課題</h2>
+      <p>4K・10bit静止画1枚のCUDAエンコードは、実機RTX 5070 Tiのwarm状態で約9〜10msを達成し、16ms理想目標・33ms現実目標のいずれも満たした。正しさはCPU参照とのbit-exact一致に加え、ISO/IEC 21122公式リファレンスデコーダによる独立検証でも確認済みである。この過程で、量子化カーネルの2次元grid化という単一の修正が、ビットストリームパッキング段の入念な最適化(係数グループ単位scatter化)を上回る改善効果を持っていたことは、大きな複合カーネル区間を1つの数値として計測し続けることのリスクを示す教訓として残る。</p>
+
+      <p>残る最適化候補としては、(1) DWTカーネル自体のより構造的な再設計(水平・垂直リフトの1レベル内融合、大規模変更のため未着手)、(2) host RC二分探索(CPU側、約1.16ms)のGPUオフロード、(3) 他のtestdataファイルでの内訳再現性確認、が挙げられる。</p>
+
+      <h3>ストレッチゴール: 1フレーム2ms以内は実現可能か</h3>
+      <p>実機での最終内訳(graph1 約7.1〜8.0ms、host RC 約1.16ms、graph2 約1.55ms、合計 約9〜10ms)を起点に、2msというさらに踏み込んだ目標が射程に入るかを検討する。</p>
+
+      <div class="budget">
+        <div class="chart-title">2msバジェットに対する現状の内訳(概算、budgetは点線ではなく赤線で表示)</div>
+        <div class="budget-track">
+          <div class="budget-fill" style="width:100%; background:linear-gradient(to right, var(--accent) 0 71%, var(--ink-muted) 71% 83%, var(--cpu) 83% 100%);"></div>
+          <div class="budget-mark" style="left:20%;"><div class="lab">2ms 目標</div></div>
+        </div>
+      </div>
+      <p style="font-size:12.5px;color:var(--ink-muted);margin-top:-4px;">帯: <span style="color:var(--accent);font-weight:600;">graph1(DWT主体)</span> / <span style="color:var(--ink-muted);font-weight:600;">host RC</span> / <span style="color:var(--cpu);font-weight:600;">graph2</span>。現状合計 約9.9ms のうち、2ms(赤線)はDWT単体の理論下限にすら届かない位置にある。</p>
+
+      <p>結論から言えば、<strong>現行のステージ分割・アーキテクチャのままでは2msは非現実的</strong>と考えられる。根拠は次の2点である。</p>
+      <ul class="plain">
+        <li><strong>DWTの理論下限が既に2msの大半を占める。</strong> DWTは演算強度 約0.44 ops/byteのメモリ帯域律速カーネルであり、開発機(224GB/s)での実測から算出した1コンポーネントあたりの理論下限(約3.66ms)を実機の理論帯域(約896GB/s、開発機比 約4倍)へ単純換算すると、3コンポーネント合計でもなお <strong>約2.7〜3ms</strong> という下限が残る。これは現状の帯域利用効率(約29%)を仮に100%まで理想的に引き上げられたとしての数字であり、量子化・Pack・host RCを一切含めない時点で既に2msの予算を使い切ってしまう。</li>
+        <li><strong>host RC二分探索はGPU最適化の範囲外にある。</strong> 現在CPU側で単一スレッド実行しているprecinct単位の二分探索(約1.16ms)は、2つのCUDA Graphの間に挟まる構造上、GPUカーネルをどれだけ最適化してもこの時間は削れない。単体で2msバジェットの半分以上を占めるため、2ms達成にはこの処理自体をGPUへ移すか、次フレームの処理と重ねて隠蔽するかのいずれかが前提条件になる。</li>
+      </ul>
+      <p>量子化・Packは既に大幅な高速化を終えており(合計 約1.55ms、うちPack単体は約0.25ms)、残された伸びしろは小さい。一方でDWTのメモリトラフィック削減アプローチ(Step B1〜B3)は3回の実装でいずれも数%程度の改善にとどまっており、帯域効率の抜本的な改善には水平・垂直リフトの構造自体を作り直すレベルの再設計が必要になると見込まれる。</p>
+
+      <div class="callout warn">
+        <div class="cl-label">結論(未検証の推定であることを明記)</div>
+        <p style="margin:0;">2ms/frameは、DWTの帯域効率を現状から大きく引き上げること(理論上の下限自体がバジェットの過半を占めるため、単なるチューニングでは足りない)と、host RC二分探索をクリティカルパスから外すこと(GPU化またはフレーム間パイプライニングによる隠蔽)の<strong>2つの構造的な変更を同時に行って初めて射程に入る</strong>、非常に野心的な目標である。現時点でこれらはいずれも未実装・未検証であり、本節はロードマップ上の見立てとして記録するに留める。</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="report-foot">
+    出典: <code>PortingStrategy.txt</code>(CUDA移植戦略・実装記録)、<code>SVT_vs_Reference_Algorithm.txt</code>(SVT/ISO参照ソフト比較調査)、<code>encoding_speed_comparison.html</code>(処理時間実測記録)を統合して作成。
+  </footer>
+</div>
